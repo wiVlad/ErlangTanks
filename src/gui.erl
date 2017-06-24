@@ -30,20 +30,26 @@ start() ->
   B1 = wxImage:new("redBody.png"),
   T1 = wxImage:new("redTurret.png"),
   wxFrame:show(Frame),
-  Tanks = [ {id1, {B1,T1}, {100,100},{0,2},{0,2} },{id2, {B1,T1},{300,300},{5,1},{0,-1}}],
+  Tanks = [ {id1, {B1,T1}, {100,100},{0,2},{0,2} }],%,{id2, {B1,T1},{300,300},{5,1},{0,-1}}],
   loop(Panel, Tanks,Frame).
 
 
 
 loop(Panel, Tanks,Frame)->
   receive
-  after 30 ->
+    {SpeedX,SpeedY} ->
+      draw_background(Panel),
+      [draw_board(Panel, {PosX+SpeedX,PosY+SpeedY}, Body,Turret,TurretDir+RotateSpeed) || {_ID, {Body,Turret}, {PosX,PosY},{_SpeedX,_SpeedY},{TurretDir,RotateSpeed}} <- Tanks],
+      TanksNew =  [{ID, {Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{TurretDir+RotateSpeed,RotateSpeed}} || {ID, {Body,Turret}, {PosX,PosY},{_SpeedX,_SpeedY},{TurretDir,RotateSpeed}} <- Tanks],
+      %draw_board(Panel, {NewX,NewY}, Image),
+      loop(Panel,TanksNew, Frame)
+ % after 30 ->
     %{NewX,NewY} = {X+1,Y},
-    draw_background(Panel),
-    [draw_board(Panel, {PosX+SpeedX,PosY+SpeedY}, Body,Turret,TurretDir+RotateSpeed) || {_ID, {Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{TurretDir,RotateSpeed}} <- Tanks],
-    TanksNew =  [{ID, {Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{TurretDir+RotateSpeed,RotateSpeed}} || {ID, {Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{TurretDir,RotateSpeed}} <- Tanks],
+    %draw_background(Panel),
+   % [draw_board(Panel, {PosX+SpeedX,PosY+SpeedY}, Body,Turret,TurretDir+RotateSpeed) || {_ID, {Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{TurretDir,RotateSpeed}} <- Tanks],
+   % TanksNew =  [{ID, {Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{TurretDir+RotateSpeed,RotateSpeed}} || {ID, {Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{TurretDir,RotateSpeed}} <- Tanks],
     %draw_board(Panel, {NewX,NewY}, Image),
-    loop(Panel,TanksNew, Frame)
+   % loop(Panel,TanksNew, Frame)
   end.
 
 draw_background(Panel) ->
