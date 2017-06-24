@@ -60,6 +60,7 @@ start_link() ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   udpClient:start(self()),
+  register(gui_pid, spawn(gui,start,[])),
   {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -79,6 +80,8 @@ init([]) ->
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_call(Request, From, State) ->
   io:format("server received ~p from ~p~n",[Request, From]),
+  Temp = binary_to_list(Request),
+  gui_pid ! Temp,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------

@@ -21,8 +21,8 @@ loop(Socket, ServerPid) ->
   inet:setopts(Socket, [{active, once}]),
   receive
     {udp, Socket, Host, Port, Bin} ->
-      gen_server:call(ServerPid, "received"),
-      io:format("server received:~p~n",[Bin]),
+      gen_server:call(ServerPid, Bin),
+      %io:format("server received:~p~n",[Bin]),
       gen_udp:send(Socket, Host, Port, Bin),
       loop(Socket, ServerPid)
   end.
