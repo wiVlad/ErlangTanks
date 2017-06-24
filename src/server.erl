@@ -81,7 +81,14 @@ init([]) ->
 handle_call(Request, From, State) ->
   io:format("server received ~p from ~p~n",[Request, From]),
   Temp = binary_to_list(Request),
-  gui_pid ! Temp,
+  io:format("attempting to send: ~p~n",[Temp]),
+  Temp2 = re:split(Temp, "[ ]",[{return,list}]),
+  io:format("temp2: ~p~n",[Temp2]),
+  case Temp2 of
+    ["connection","successful"] -> ok;
+    [Angle, Strength] -> gui_pid ! {list_to_integer(Angle), list_to_integer(Strength)}
+  end,
+
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
