@@ -7,24 +7,25 @@
 %%% Created : 24. Jun 2017 19:43
 %%%-------------------------------------------------------------------
 -module(udpClient).
--export([start/1, client/1]).
+-export([start/0, client/1]).
 
-start(ServerPid) ->
-  spawn(fun() -> server(4000, ServerPid) end).
+start() ->
+  spawn(fun() -> server(4000) end).
 
-server(Port, ServerPid) ->
+server(Port) ->
   {ok, Socket} = gen_udp:open(Port, [binary, {active, false}]),
   io:format("server opened socket:~p~n",[Socket]),
-  loop(Socket, ServerPid).
+  loop(Socket).
 
-loop(Socket, ServerPid) ->
+loop(Socket) ->
   inet:setopts(Socket, [{active, once}]),
   receive
     {udp, Socket, Host, Port, Bin} ->
-      gen_server:call(ServerPid, Bin),
+      gen_server:call(main_server, Bin),
       %io:format("server received:~p~n",[Bin]),
       gen_udp:send(Socket, Host, Port, Bin),
-      loop(Socket, ServerPid)
+      loop(Socket);
+    {exit} -> ok
   end.
 
 % Client code

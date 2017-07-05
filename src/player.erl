@@ -4,9 +4,9 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created : 24. Jun 2017 17:50
+%%% Created : 05. Jul 2017 20:14
 %%%-------------------------------------------------------------------
--module(server).
+-module(player).
 -author("jon").
 
 -behaviour(gen_server).
@@ -22,7 +22,8 @@
   terminate/2,
   code_change/3]).
 
--define(SERVER, main_server).
+-define(SERVER, ?MODULE).
+
 -record(state, {}).
 
 %%%===================================================================
@@ -39,7 +40,6 @@
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-  %gen_server is registered under the name "main_server"
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -60,10 +60,6 @@ start_link() ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  %register(udp_pid, udpClient:start()),
-  udp_server:start_link(),
-  gui_server:start_link(),
-  %gui gen_server is registered under the name "gui_server"
   {ok, #state{}}.
 
 %%--------------------------------------------------------------------
@@ -81,25 +77,7 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, From, State) ->
-  io:format("server received ~p from ~p~n",[Request, From]),
-  %Temp = binary_to_list(Request),
-  %io:format("attempting to send: ~p~n",[Temp]),
-  Temp2 = re:split(Request, "[ ]",[{return,list}]),
-  io:format("temp2: ~p~n",[Temp2]),
-  case Temp2 of
-    [PlayerName, "connection","successful"] ->
-      gen_server:call(gui_server, {PlayerName});
-      %gui_pid ! {PlayerName};
-    ["FIRE", PlayerName] ->
-      gen_server:call(gui_server, {PlayerName, fire});
-    [PlayerName, X,Y, Angle, fire] ->
-      shell_server:start_link({PlayerName,X,Y,Angle});
-    [PlayerName, X, Y, Angle] ->
-      gen_server:call(gui_server, {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
-      %gui_pid ! {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)}
-  end,
-
+handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -147,9 +125,8 @@ handle_info(_Info, State) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
-  gen_server:call(gui_server, {exit}), %gui_pid ! {exit},
-  %udp_pid ! {exit}.
-  gen_server:cast(udp_server, exit).
+  ok.
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
