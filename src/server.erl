@@ -22,7 +22,7 @@
   terminate/2,
   code_change/3]).
 
--define(SERVER, ?MODULE).
+-define(SERVER, main_server).
 -record(state, {}).
 
 %%%===================================================================
@@ -39,6 +39,7 @@
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+  %gen_server is registered under the name "main_server"
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -59,7 +60,7 @@ start_link() ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  udpClient:start(self()),
+  register(udp_pid, udpClient:start()),
   register(gui_pid, spawn(gui,start,[])),
   {ok, #state{}}.
 
@@ -85,8 +86,8 @@ handle_call(Request, From, State) ->
   Temp2 = re:split(Temp, "[ ]",[{return,list}]),
   io:format("temp2: ~p~n",[Temp2]),
   case Temp2 of
-    ["connection","successful"] -> ok;
-    [Angle, Strength] -> gui_pid ! {list_to_integer(Angle), list_to_integer(Strength)}
+    [PlayerName, "connection","successful"] -> gui_pid ! {PlayerName};
+    [PlayerName, X, Y, Angle] -> gui_pid ! {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)}
   end,
 
   {reply, ok, State}.
@@ -136,7 +137,8 @@ handle_info(_Info, State) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
-  ok.
+  gui_pid ! {exit},
+  udp_pid ! {exit}.
 
 %%--------------------------------------------------------------------
 %% @private
