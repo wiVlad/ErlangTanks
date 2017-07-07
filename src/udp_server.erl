@@ -17,6 +17,7 @@ stop() ->
 init(_Params) ->
   {ok, Sock} = gen_udp:open(?SERVER_PORT),
   io:format("Init Sock ~p~n", [Sock]),
+  io:format("UDP Server online ~n"),
   {ok, {server, Sock}}.
 
 terminate(_Reason, {server, Sock}) ->

@@ -61,9 +61,10 @@ start_link() ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   %register(udp_pid, udpClient:start()),
-  udp_server:start_link(),
-  gui_server:start_link(),
+  %udp_server:start_link(),
+  %gui_server:start_link(),
   %gui gen_server is registered under the name "gui_server"
+  io:format("General Server online ~n"),
   {ok, #state{}}.
 
 %%--------------------------------------------------------------------

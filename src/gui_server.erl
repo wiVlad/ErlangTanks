@@ -62,6 +62,7 @@ start_link() ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
+  io:format("GUI Server online ~n"),
   ets:new(tanks, [set, named_table]),
   Wx = wx:new(),
   Frame = wxFrame:new(Wx, -1, "Main Game Frame", [{size, {?max_x, ?max_y}}]),
