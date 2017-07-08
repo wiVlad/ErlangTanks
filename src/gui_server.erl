@@ -63,7 +63,11 @@ start_link() ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   io:format("GUI Server online ~n"),
-  ets:new(tanks, [set, named_table]),
+  ets:new(colors, [set, named_table]),
+  ets:insert(colors, [{"Graphics/redBody.png","Graphics/redTurret.png"},
+    {"Graphics/blueBody.png","Graphics/blueTurret.png"},
+    {"Graphics/cyanBody.png","Graphics/cyanTurret.png"},
+    {"Graphics/greenBody.png","Graphics/greenTurret.png"}]),
   Wx = wx:new(),
   Frame = wxFrame:new(Wx, -1, "Main Game Frame", [{size, {?max_x, ?max_y}}]),
   MenuBar = wxMenuBar:new(),
@@ -107,14 +111,16 @@ init([]) ->
 handle_call(Request, _From, {Panel,Tanks}) ->
   case Request of
       {exit} ->
-        ets:delete(tanks),
+        ets:delete(colors),
         State = ok;
       {Player, fire} ->
         {{Body,Turret}, {PosX,PosY},{_SpeedX,_SpeedY},{OldAngle}} = maps:get(Player,Tanks),
         gen_server:call(main_server, PosX,PosY, OldAngle, fire),
         State = ok;
       {Player} ->
-        ets:insert(tanks,{Player,{100,100}}),
+        BodyIm = ets:first(colors),
+        {_Key,TurretIm} = hd(ets:lookup(colors,BodyIm)),
+        ets:delete(colors,BodyIm),
         Paint = wxPaintDC:new(Panel),
         Brush1 = wxBrush:new(),
         wxBrush:setColour(Brush1, ?wxBLACK),
@@ -122,20 +128,33 @@ handle_call(Request, _From, {Panel,Tanks}) ->
         wxDC:drawRectangle(Paint,{0,0,?max_x,?max_y}),
         wxBrush:destroy(Brush1),
         wxPaintDC:destroy(Paint),
-        State = {Panel,Tanks#{Player => {{ wxImage:new("Graphics/redBody.png"), wxImage:new("Graphics/redTurret.png")}, {100,100},{0,2},{0} }}};
-       % loop(Panel, Tanks#{Player => {{ wxImage:new("Graphics/redBody.png"), wxImage:new("Graphics/redTurret.png")}, {100,100},{0,2},{0} }}, Frame);
-      {Player,SpeedX,SpeedY, Angle} ->
-        BodyPic = wxImage:new("Graphics/redBody.png"),
-        {{Body,Turret}, {PosX,PosY},{_SpeedX,_SpeedY},{OldAngle}} = maps:get(Player,Tanks),
-        draw_background(Panel, PosX,PosY-5, wxImage:getWidth(BodyPic),wxImage:getHeight(BodyPic)+10),
+        State = {Panel,Tanks#{Player => {{ wxImage:new(BodyIm), wxImage:new(TurretIm)}, {100,100},{0,2},{0,0} }}};
 
+      {Player,Angle}  ->
+        BodyPic = wxImage:new("Graphics/redBody.png"),
+        {{Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{OldBodyAngle, OldTurretAngle}} = maps:get(Player,Tanks),
+        draw_background(Panel, PosX,PosY-5, wxImage:getWidth(BodyPic),wxImage:getHeight(BodyPic)+10),
+        draw_body(Panel, {PosX,SpeedX,PosY,SpeedY}, Body,Turret,OldBodyAngle),
         if (Angle =:= 0) ->
-          EffAngle =  OldAngle;
+          EffAngle =  OldTurretAngle;
           true -> EffAngle = Angle
         end,
-        draw_board(Panel, {PosX,SpeedX,PosY,SpeedY}, Body,Turret,EffAngle),
+        draw_turret(Panel, {PosX,SpeedX,PosY,SpeedY}, Body,Turret,EffAngle),
+        State = {Panel, maps:update(Player,{{Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{OldBodyAngle,EffAngle}}, Tanks)};
+
+      {Player,SpeedX,SpeedY, Angle} ->
+        BodyPic = wxImage:new("Graphics/redBody.png"),
+        {{Body,Turret}, {PosX,PosY},{_SpeedX,_SpeedY},{OldBodyAngle,OldTurretAngle}} = maps:get(Player,Tanks),
+        draw_background(Panel, PosX-15,PosY-10, wxImage:getWidth(BodyPic)+30,wxImage:getHeight(BodyPic)+25),
+        draw_body(Panel, {PosX,SpeedX,PosY,SpeedY}, Body,Turret,OldBodyAngle),
+        if (Angle =:= 0) ->
+          EffAngle =  OldBodyAngle;
+          true -> EffAngle = Angle
+        end,
+        draw_body(Panel, {PosX,SpeedX,PosY,SpeedY}, Body,Turret,EffAngle),
+        draw_turret(Panel, {PosX,SpeedX,PosY,SpeedY}, Body,Turret,OldTurretAngle),
         %TanksNew = maps:update(Player,{{Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{EffAngle}}, Tanks)
-        State = {Panel, maps:update(Player,{{Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{EffAngle}}, Tanks)}
+        State = {Panel, maps:update(Player,{{Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{EffAngle,OldTurretAngle}}, Tanks)}
         end,
     {reply, ok, State}.
 
@@ -220,7 +239,22 @@ draw_background(Panel, X,Y,SizeX,SizeY) ->
 % wxBitmap:destroy(Bitmap2),
 % wxClientDC:destroy(ClientDC).
 
-draw_board(Panel, {X, X_add, Y, Y_add}, Body, Turret, Dir) ->
+draw_body(Panel, {X, X_add, Y, Y_add}, Body, _Turret, Dir) ->
+  Xnew = X +X_add, Ynew = Y + Y_add,
+  Pos = {round(Xnew), round(Ynew)},
+  Pos2 = {round(Xnew)+13, round(Ynew)-15},
+  ClientDC = wxClientDC:new(Panel),
+  Bitmap = wxBitmap:new(Body),
+  %wxDC:drawBitmap(ClientDC, Bitmap, Pos),
+  Img = wxImage:rotate(Body,3.14+(Dir/180)*3.14,{90, 90}), %[ {interpolating, true},{offset_after_rotation, {100,100}}]),getHeight
+  %Img = wxImage:rotate90(Turret),
+  Bitmap2 = wxBitmap:new(Img),
+  %wxDC:drawBitmap(ClientDC, Bitmap2, {round(X)+13-wxBitmap:getWidth(Bitmap2), round(Y)-15-wxBitmap:getHeight(Bitmap2)}),
+  wxDC:drawBitmap(ClientDC, Bitmap2, {round(Xnew+45-wxImage:getHeight(Img)/2), round(Ynew-15+60-wxImage:getWidth(Img)/2)}),
+  wxBitmap:destroy(Bitmap),
+  wxClientDC:destroy(ClientDC).
+
+draw_turret(Panel, {X, X_add, Y, Y_add}, Body, Turret, Dir) ->
   Xnew = X +X_add, Ynew = Y + Y_add,
   Pos = {round(Xnew), round(Ynew)},
   Pos2 = {round(Xnew)+13, round(Ynew)-15},

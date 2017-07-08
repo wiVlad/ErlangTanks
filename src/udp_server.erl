@@ -26,9 +26,9 @@ terminate(_Reason, {server, Sock}) ->
 handle_cast(stop, {server, Sock}) ->
   {stop, normal, {server, Sock}}.
 
-handle_info({udp, Client, _Ip, _Port, Msg}, LoopData) ->
-  io:format("receive udp data ~p from ~p~n", [Msg, Client]),
-  gen_server:call(main_server, Msg),
+handle_info({udp, _Client, Ip, _Port, Msg}, LoopData) ->
+  %io:format("receive udp data ~p from ~p~n", [Msg, Ip]),
+  gen_server:call(main_server, {Ip,Msg}),
   {noreply, LoopData};
 
 handle_info(Msg, LoopData) ->

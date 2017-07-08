@@ -6,7 +6,7 @@
 %%% @end
 %%% Created : 05. Jul 2017 21:14
 %%%-------------------------------------------------------------------
--module(shell).
+-module(shell_server).
 -author("jon").
 
 -behaviour(gen_server).

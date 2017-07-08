@@ -82,22 +82,22 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, From, State) ->
-  io:format("server received ~p from ~p~n",[Request, From]),
+handle_call({Ip,Request}, _From, State) ->
+  %io:format("server received ~p from ~p~n",[Request, Ip]),
   %Temp = binary_to_list(Request),
   %io:format("attempting to send: ~p~n",[Temp]),
   Temp2 = re:split(Request, "[ ]",[{return,list}]),
-  io:format("temp2: ~p~n",[Temp2]),
+  %io:format("temp2: ~p~n",[Temp2]),
   case Temp2 of
     [PlayerName, "connection","successful"] ->
-      gen_server:call(gui_server, {PlayerName});
+      gen_server:call(gui_server, {Ip});
       %gui_pid ! {PlayerName};
-    ["FIRE", PlayerName] ->
-      gen_server:call(gui_server, {PlayerName, fire});
-    [PlayerName, X,Y, Angle, fire] ->
-      shell_server:start_link({PlayerName,X,Y,Angle});
-    [PlayerName, X, Y, Angle] ->
-      gen_server:call(gui_server, {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
+    ["FIRE", Ip] ->
+      ok; %gen_server:call(gui_server, {Ip, fire});
+    ["Turret", Angle] ->
+      gen_server:call(gui_server, {Ip, list_to_integer(Angle)});
+      ["Body", X, Y, Angle] ->
+      gen_server:call(gui_server, {Ip, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
       %gui_pid ! {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)}
   end,
 
