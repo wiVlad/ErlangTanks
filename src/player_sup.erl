@@ -14,7 +14,7 @@
 %% API
 -export([
   start_link/0,
-  start_player/2
+  start_player/1
   ]).
 
 %% Supervisor callbacks
@@ -78,5 +78,5 @@ init([]) ->
 %%% Internal functions
 %%%===================================================================
 %TODO: Decide which parameter are passed in player's initialization
-start_player(Name, ID) ->
-  supervisor:start_child(?MODULE, [Name, ID]).
+start_player(ID) ->
+  supervisor:start_child(?MODULE, [ID]).

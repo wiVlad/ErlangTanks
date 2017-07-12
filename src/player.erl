@@ -23,8 +23,10 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
+-define(max_x,(1024)).
+-define(max_y,(768)).
 
--record(state, {}).
+-record(state, {id,xPos,yPos,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}).
 
 %%%===================================================================
 %%% API
@@ -59,8 +61,12 @@ start_link() ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([]) ->
-  {ok, #state{}}.
+init([ID]) ->
+  io:format("New Player, ID: ~p ~n", [ID]),
+  NewX = random:uniform()*500,
+  NewY = random:uniform()*500,
+  gen_server:call(gui_server, {ID, NewX,NewY,0}),
+  {ok, #state{id = ID ,xPos = NewX ,yPos = NewY ,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -77,8 +83,37 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(_Request, _From, State) ->
-  {reply, ok, State}.
+
+handle_call({fire, ID}, _From, State = #state{ id = ID, xPos = X, yPos = Y, turretDir = Dir, ammo = Ammo}) ->
+  NewAmmo = Ammo - 1,
+  shell_sup:start_new_shell(X,Y,Dir),
+  {reply, ok, State = #state{ ammo = NewAmmo }};
+
+handle_call({moveBody, ID ,Xspeed, Yspeed,Angle}, _From, State = #state{ id = ID, xPos = Xcur, yPos = Ycur}) ->
+  if
+    (((Xspeed + Xcur) < 0) or ((Xspeed + Xcur) > max_x)) ->
+      NewX = Xcur;
+    true ->
+      NewX = Xcur + Xspeed
+  end,
+  if
+    (((Yspeed + Ycur) < 0) or ((Yspeed + Ycur) > max_x)) ->
+      NewY = Ycur;
+    true ->
+      NewY = Ycur + Yspeed
+  end,
+  gen_server:call(gui_server, {ID, NewX,NewY,Angle}),
+  {reply, ok, State = #state{ xPos = NewX, yPos = NewY, bodyDir = Angle}};
+
+handle_call({moveTurret, Angle}, _From, State = #state{ id= ID }) ->
+  gen_server:call(gui_server, {ID, Angle}),
+  {reply, ok, State = #state{turretDir = Angle}};
+
+handle_call({hit}, _From, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
+  HPn = HP - 10,
+  gen_server:call(gui_server, {explode, X, Y}),
+  {reply, ok, State = #state{ hitPoints = HPn }}.
+
 
 %%--------------------------------------------------------------------
 %% @private

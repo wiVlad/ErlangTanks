@@ -38,7 +38,7 @@ handle_info(Msg, LoopData) ->
 send(Msg) ->
   gen_server:call(?MODULE, {message, Msg}).
 
-handle_call(Request, _From, A) ->%{server,Sock}) ->
+handle_call(Request, _From, A) ->
   io:format("asdfadsf receive udp data ~p~n", [Request]),
 
   case Request of

@@ -90,15 +90,16 @@ handle_call({Ip,Request}, _From, State) ->
   %io:format("temp2: ~p~n",[Temp2]),
   case Temp2 of
     [PlayerName, "connection","successful"] ->
+      player_sup:start_player(Ip),
       gen_server:call(gui_server, {Ip});
       %gui_pid ! {PlayerName};
-    ["FIRE", Ip] ->
-      ok; %gen_server:call(gui_server, {Ip, fire});
+    ["FIRE"] ->
+      gen_server:call(player, {fire, Ip}); %gen_server:call(gui_server, {Ip, fire});
     ["Turret", Angle] ->
-      gen_server:call(gui_server, {Ip, list_to_integer(Angle)});
-      ["Body", X, Y, Angle] ->
-      gen_server:call(gui_server, {Ip, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
-      %gui_pid ! {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)}
+      gen_server:call(player, {moveTurret, list_to_integer(Angle)});
+    ["Body", X, Y, Angle] ->
+      gen_server:call(player, {moveBody, Ip, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
+
   end,
 
   {reply, ok, State}.

@@ -111,6 +111,7 @@ init([]) ->
 handle_call(Request, _From, {Panel,Tanks}) ->
   case Request of
       {exit} ->
+        io:format("GUI Server EXITING FROM HANDLE CALL ~n"),
         ets:delete(colors),
         State = ok;
       {Player, fire} ->
@@ -203,6 +204,7 @@ handle_info(_Info, State) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
+  io:format("GUI Server exit from teminate ~n"),
   ok.
 
 %%--------------------------------------------------------------------

@@ -59,8 +59,10 @@ start_link() ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([{X,Y}]) ->
-  gen_server:call(gui_server, {shell, {X,Y}}),
+init([{X,Y, Dir}]) ->
+  X_inc = 10 * math:cos( Dir * math:pi() / 180),
+  Y_inc = 10 * math:sin( Dir * math:pi() / 180),
+  loopFire(X,Y,Dir,X_inc,Y_inc),
   {ok, {fired}}.
 
 %%--------------------------------------------------------------------
@@ -145,3 +147,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+loopFire(X,Y,Dir,X_inc,Y_inc) ->
+  receive
+
+  after 100 ->
+    %TODO: Send all player's tank {hit} message
+    gen_server:call(gui_server, {shell, {X + X_inc, Y + Y_inc, Dir}}),
+    loopFire(X + X_inc,Y + Y_inc,Dir,X_inc,Y_inc)
+  end.
