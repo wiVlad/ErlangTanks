@@ -60,7 +60,7 @@ start_link(X,Y,Dir) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([X,Y, Dir]) ->
-  X_inc = 10 * math:cos( 3.14+(Dir/180)*3.14),
+  X_inc =  - 10 * math:cos( 3.14+(Dir/180)*3.14),
   Y_inc = 10 * math:sin( 3.14+(Dir/180)*3.14),
   erlang:send_after(?INTERVAL, self(), trigger),
 %  loopFire(X,Y,Dir,X_inc,Y_inc),

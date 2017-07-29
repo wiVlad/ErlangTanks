@@ -24,8 +24,8 @@
 
 -define(SERVER, ?MODULE).
 -include_lib("wx/include/wx.hrl").
--define(max_x,(1024)).
--define(max_y,(768)).
+-define(max_x,(1000)).
+-define(max_y,(700)).
 -record(state, {}).
 
 %%%===================================================================
@@ -235,10 +235,12 @@ draw_turret(Panel, {X, Y}, Turret, Dir) ->
 
 draw_shell(Panel, Xold, Yold, Xnew, Ynew, ShellPic, ErasePic, Dir) ->
   ClientDC = wxClientDC:new(Panel),
-  Erase = wxImage:rotate(ErasePic,Dir/50,{15, 15}),
-  Shell = wxImage:rotate(ShellPic,Dir/50,{15, 15}),
+  Erase = wxImage:rotate(ErasePic,3.14+(Dir/180)*3.14,{90, 90}),
+  Shell = wxImage:rotate(ShellPic,3.14+(Dir/180)*3.14,{90, 90}),
   BitmapShellErase = wxBitmap:new(Erase),
   BitmapShell = wxBitmap:new(Shell),
-  wxDC:drawBitmap(ClientDC, BitmapShellErase, {round(Xold-wxImage:getHeight(Shell)/2), round(Yold-wxImage:getWidth(Shell)/2)}),
-  wxDC:drawBitmap(ClientDC, BitmapShell, {round(Xnew-wxImage:getHeight(Shell)/2), round(Ynew-wxImage:getWidth(Shell)/2)}),
+  XoS = (Xnew - Xold)*5,
+  YoS = (Ynew - Yold)*5,
+  wxDC:drawBitmap(ClientDC, BitmapShellErase, {round(Xold+XoS+45-wxImage:getHeight(Shell)/2), round(Yold+YoS+45-wxImage:getWidth(Shell)/2)}),
+  wxDC:drawBitmap(ClientDC, BitmapShell, {round(Xnew+XoS+45-wxImage:getHeight(Shell)/2), round(Ynew+YoS+45-wxImage:getWidth(Shell)/2)}),
   wxClientDC:destroy(ClientDC).
