@@ -130,7 +130,11 @@ handle_call(Request, _From, {Panel}) ->
     {shell, X, Y, NewX,NewY,Dir} ->
       EraseShell = wxImage:new("Graphics/eraseShell.png"),
       ShellPic = wxImage:new("Graphics/Shell.png"),
-      draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir)
+      draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir);
+
+    {explosion, X, Y} ->
+      draw_explosion(Panel, X, Y)
+
 
   end,
   {reply, ok, {Panel}}.
@@ -243,4 +247,12 @@ draw_shell(Panel, Xold, Yold, Xnew, Ynew, ShellPic, ErasePic, Dir) ->
   YoS = (Ynew - Yold)*5,
   wxDC:drawBitmap(ClientDC, BitmapShellErase, {round(Xold+XoS+45-wxImage:getHeight(Shell)/2), round(Yold+YoS+45-wxImage:getWidth(Shell)/2)}),
   wxDC:drawBitmap(ClientDC, BitmapShell, {round(Xnew+XoS+45-wxImage:getHeight(Shell)/2), round(Ynew+YoS+45-wxImage:getWidth(Shell)/2)}),
+  wxClientDC:destroy(ClientDC).
+
+draw_explosion(Panel, X, Y) ->
+  ClientDC = wxClientDC:new(Panel),
+  Img = wxImage:new("Graphics/explosion.png"),
+  Bitmap = wxBitmap:new(Img),
+  wxDC:drawBitmap(ClientDC, Bitmap, {round(X+45-wxImage:getHeight(Img)/2), round(Y-15+60-wxImage:getWidth(Img)/2)}),
+  wxBitmap:destroy(Bitmap),
   wxClientDC:destroy(ClientDC).
