@@ -128,9 +128,13 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
   gen_server:call(gui_server, {turret,BodyIm,TurretIm, Xcur, Ycur, EffAngle, BodyAngle}),
   {reply, ok, State#state{turretDir = EffAngle}};
 
-handle_call({hit}, _From, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
-  HPn = HP - 10,
-  gen_server:call(gui_server, {explode, X, Y}),
+handle_call({hit,ShellX,ShellY}, _From, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
+  if
+    ((ShellX - X < 50) and (ShellY-Y<50)) ->
+      HPn = HP - 10,
+      gen_server:call(gui_server, {explosion, X, Y});
+    true -> HPn = HP
+  end,
   {reply, ok, State#state{ hitPoints = HPn }}.
 
 

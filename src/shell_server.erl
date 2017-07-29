@@ -113,8 +113,15 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed}) ->
-  if ((X<1024) and (X > 0) and (Y < 768) and (Y>0)) ->
-    gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir});
+  if
+    ((X<1300) and (X > -5) and (Y < 768) and (Y>-5)) ->
+      gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
+      lists:foreach(fun({_Ip,Pid}) ->
+        if
+          (Pid /= self()) -> gen_server:call(Pid, {hit,X,Y});
+          true -> ok
+        end
+       end, ets:tab2list(ids));
     true -> terminate(normal,exploded)
   end,
   erlang:send_after(?INTERVAL, self(), trigger),

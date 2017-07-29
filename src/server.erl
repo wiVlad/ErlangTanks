@@ -60,11 +60,7 @@ start_link() ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  %register(udp_pid, udpClient:start()),
-  %udp_server:start_link(),
-  %gui_server:start_link(),
-  %gui gen_server is registered under the name "gui_server"
-  ets:new(ids, [set, named_table]),
+  ets:new(ids, [set, named_table, public]),
   io:format("General Server online ~n"),
   {ok, #state{}}.
 
