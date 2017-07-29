@@ -61,13 +61,19 @@ start_link() ->
   {error, Reason :: term()}).
 
 init([]) ->
-  RestartStrategy = simple_one_for_one,
-  MaxRestarts = 1000,
-  MaxSecondsBetweenRestarts = 3600,
-  SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
-  Restart = permanent,
-  Shutdown = 2000,
-  Type = worker,
+    ets:new(colors, [set, named_table,public]),
+    ets:insert(colors, [{"Graphics/redBody.png","Graphics/redTurret.png"},
+      {"Graphics/blueBody.png","Graphics/blueTurret.png"},
+      {"Graphics/cyanBody.png","Graphics/cyanTurret.png"},
+      {"Graphics/greenBody.png","Graphics/greenTurret.png"}]),
+
+    RestartStrategy = simple_one_for_one,
+    MaxRestarts = 1000,
+    MaxSecondsBetweenRestarts = 3600,
+    SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
+    Restart = permanent,
+    Shutdown = 2000,
+    Type = worker,
 
   AChild = {'?MODULE', {'player', start_link, []},
     Restart, Shutdown, Type, ['player']},
@@ -76,7 +82,12 @@ init([]) ->
 
 %%%===================================================================
 %%% Internal functions
-%%%===================================================================
+%%%===========================  ========================================
 %TODO: Decide which parameter are passed in player's initialization
 start_player(Name, ID) ->
-  supervisor:start_child(?MODULE, [Name, ID]).
+  BodyIm = ets:first(colors),
+  {_Key,TurretIm} = hd(ets:lookup(colors,BodyIm)),
+  io:format("~n~p ~p~n", [BodyIm,TurretIm]),
+  ets:delete(colors,BodyIm),
+  Pid = supervisor:start_child(?MODULE, [Name,ID,BodyIm,TurretIm]),
+  Pid.

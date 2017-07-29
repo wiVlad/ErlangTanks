@@ -64,6 +64,7 @@ init([]) ->
   %udp_server:start_link(),
   %gui_server:start_link(),
   %gui gen_server is registered under the name "gui_server"
+  ets:new(ids, [set, named_table]),
   io:format("General Server online ~n"),
   {ok, #state{}}.
 
@@ -83,21 +84,25 @@ init([]) ->
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_call({Ip,Request}, _From, State) ->
-  %io:format("server received ~p from ~p~n",[Request, Ip]),
-  %Temp = binary_to_list(Request),
-  %io:format("attempting to send: ~p~n",[Temp]),
+
   Temp2 = re:split(Request, "[ ]",[{return,list}]),
-  %io:format("temp2: ~p~n",[Temp2]),
+
   case Temp2 of
     [PlayerName, "connection","successful"] ->
-      gen_server:call(gui_server, {Ip});
-      %gui_pid ! {PlayerName};
-    ["FIRE", Ip] ->
-      ok; %gen_server:call(gui_server, {Ip, fire});
+      %gen_server:call(gui_server, {Ip}),
+      {ok, PID} = player_sup:start_player(PlayerName, Ip),
+      ets:insert(ids, {Ip, PID});
+    ["FIRE"] ->
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      gen_server:call(Pid, {fire, Ip});
     ["Turret", Angle] ->
-      gen_server:call(gui_server, {Ip, list_to_integer(Angle)});
-      ["Body", X, Y, Angle] ->
-      gen_server:call(gui_server, {Ip, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
+     % gen_server:call(gui_server, {Ip, list_to_integer(Angle)});
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
+    ["Body", X, Y, Angle] ->
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)})
+     % gen_server:call(gui_server, {Ip, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
       %gui_pid ! {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)}
   end,
 
@@ -148,9 +153,7 @@ handle_info(_Info, State) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
-  gen_server:call(gui_server, {exit}), %gui_pid ! {exit},
-  %udp_pid ! {exit}.
-  gen_server:cast(udp_server, exit).
+  ok.
 %%--------------------------------------------------------------------
 %% @private
 %% @doc

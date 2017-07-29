@@ -18,32 +18,39 @@ init(_Params) ->
   {ok, Sock} = gen_udp:open(?SERVER_PORT),
   io:format("Init Sock ~p~n", [Sock]),
   io:format("UDP Server online ~n"),
-  {ok, {server, Sock}}.
+  {ok, {[], Sock}}.
 
-terminate(_Reason, {server, Sock}) ->
+terminate(_Reason, {Connections, Sock}) ->
+  io:format("UDP Server terminated ~n"),
   gen_udp:close(Sock).
 
-handle_cast(stop, {server, Sock}) ->
-  {stop, normal, {server, Sock}}.
+handle_cast(stop, {Connections, Sock}) ->
+  {stop, normal, {Connections, Sock}}.
 
-handle_info({udp, _Client, Ip, _Port, Msg}, LoopData) ->
-  %io:format("receive udp data ~p from ~p~n", [Msg, Ip]),
+handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
+  Temp = re:split(Msg, "[ ]",[{return,list}]),
+  io:format("Temp: ~p from ~p ~n", [Temp, Ip]),
+  case Temp of
+    [PlayerName, "connection","successful"] ->
+      gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("connected")),
+      NewConnections = [Ip|Connections];
+    _A -> NewConnections = Connections
+  end,
   gen_server:call(main_server, {Ip,Msg}),
-  {noreply, LoopData};
+  {noreply, {NewConnections,Sock}};
 
 handle_info(Msg, LoopData) ->
   io:format("receive info ~p~n", [Msg]),
   {noreply, LoopData}.
 
 send(Msg) ->
+
   gen_server:call(?MODULE, {message, Msg}).
 
-handle_call(Request, _From, A) ->%{server,Sock}) ->
-  io:format("asdfadsf receive udp data ~p~n", [Request]),
-
-  case Request of
-    {udp, Socket, Host, Port, Bin} ->
-      gen_server:call(main_server, Bin);
-      _ -> io:format("receive udp data ~p~n", [Request])
-  end,
-  {reply, ok, A}.
+handle_call(Request, _From, {Connections,Sock}) ->%{server,Sock}) ->
+  io:format("received exit, sending exit ~p~n", [Request]),
+  %io:format(gen_udp:send(Sock, "192.168.14.166", 4000,  list_to_binary("exit"))),
+  lists:foreach(fun(A) ->
+    gen_udp:send(Sock, A, ?SERVER_PORT, list_to_binary("exit"))
+                end, Connections),
+  {reply, ok, {[],Sock}}.

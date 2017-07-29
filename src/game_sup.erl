@@ -67,8 +67,8 @@ init([]) ->
     ?CHILD(shell_sup, supervisor),
     ?CHILD(player_sup, supervisor),
 
-    ?CHILD(gui_server, supervisor),
-    ?CHILD(udp_server, supervisor),
+    ?CHILD(gui_server, worker),
+    ?CHILD(udp_server, worker),
     ?CHILD(server, supervisor)],
 
   {ok, {SupFlags, Children}}.

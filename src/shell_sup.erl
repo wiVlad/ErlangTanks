@@ -14,7 +14,7 @@
 %% API
 -export([
   start_link/0,
-  start_new_shell/2
+  start_new_shell/3
   ]).
 
 %% Supervisor callbacks
@@ -68,8 +68,8 @@ init([]) ->
   Shutdown = 2000,
   Type = worker,
 
-  AChild = {'?MODULE', {'shell', start_link, []},
-    Restart, Shutdown, Type, ['shell']},
+  AChild = {'?MODULE', {'shell_server', start_link, []},
+    Restart, Shutdown, Type, ['shell_server']},
   io:format("Shell Supervisor online ~n"),
   {ok, {SupFlags, [AChild]}}.
 
@@ -77,5 +77,5 @@ init([]) ->
 %%% Internal functions
 %%%===================================================================
 %TODO: Decide which parameter are passed in shell's initialization
-start_new_shell(X,Y) -> % X,Y,Dir) ->
-  supervisor:start_child(?MODULE, [X,Y]). %X,Y,Dir]).
+start_new_shell(X,Y,Dir) ->
+  supervisor:start_child(?MODULE, [X,Y,Dir]).

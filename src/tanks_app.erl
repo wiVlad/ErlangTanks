@@ -57,7 +57,8 @@ start(_StartType, _StartArgs) ->
 
 %TODO: Implement stop functions
 stop(_State) ->
-  ok.
+  gen_server:call(udp_server, exit),
+  exit(whereis(game_sup),normal).
 
 %%%===================================================================
 %%% Internal functions
