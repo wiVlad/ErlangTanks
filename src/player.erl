@@ -92,9 +92,7 @@ handle_call({fire, ID}, _From, State = #state{ id = ID, xPos = X, yPos = Y, turr
   NewAmmo = Ammo - 1,
   if
     (NewAmmo > 0) ->
-      io:format("~n received new missle fire th ~n"),
-      shell_sup:start_new_shell(X,Y,Dir);
-
+      shell_sup:start_new_shell(X,Y,Dir,self());
     true -> ok
   end,
 
@@ -128,11 +126,12 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
   gen_server:call(gui_server, {turret,BodyIm,TurretIm, Xcur, Ycur, EffAngle, BodyAngle}),
   {reply, ok, State#state{turretDir = EffAngle}};
 
-handle_call({hit,ShellX,ShellY}, _From, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
+handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
   if
-    ((ShellX - X < 50) and (ShellY-Y<50)) ->
+    ((abs(ShellX - (X+45)) < 50) and (abs(ShellY-(Y+45))<50)) ->
       HPn = HP - 10,
-      gen_server:call(gui_server, {explosion, X, Y});
+      gen_server:call(gui_server, {explosion, X, Y}),
+      supervisor:terminate_child(shell_sup,From);
     true -> HPn = HP
   end,
   {reply, ok, State#state{ hitPoints = HPn }}.
@@ -184,6 +183,8 @@ handle_info(_Info, State) ->
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
   ok.
+
+%TODO: what happens when 0 HP ? perhaps image of busted tank
 
 %%--------------------------------------------------------------------
 %% @private

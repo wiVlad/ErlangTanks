@@ -167,3 +167,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+
+%TODO: add randomly generated health packages
+%TODO: add side panel with game stats

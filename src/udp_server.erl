@@ -20,7 +20,7 @@ init(_Params) ->
   io:format("UDP Server online ~n"),
   {ok, {[], Sock}}.
 
-terminate(_Reason, {Connections, Sock}) ->
+terminate(_Reason, {_Connections, Sock}) ->
   io:format("UDP Server terminated ~n"),
   gen_udp:close(Sock).
 
@@ -29,9 +29,8 @@ handle_cast(stop, {Connections, Sock}) ->
 
 handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
   Temp = re:split(Msg, "[ ]",[{return,list}]),
-  io:format("Temp: ~p from ~p ~n", [Temp, Ip]),
   case Temp of
-    [PlayerName, "connection","successful"] ->
+    [_PlayerName, "connection","successful"] ->
       gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("connected")),
       NewConnections = [Ip|Connections];
     _A -> NewConnections = Connections

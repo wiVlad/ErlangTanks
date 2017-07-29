@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/3]).
+-export([start_link/4]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -36,10 +36,10 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(Args :: term(), Args :: term(), Args :: term()) ->
+-spec(start_link(Args :: term(), Args :: term(), Args :: term(), Args :: term()) ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link(X,Y,Dir) ->
-  gen_server:start_link(?MODULE, [X,Y,Dir], []).
+start_link(X,Y,Dir,PlayerPid) ->
+  gen_server:start_link(?MODULE, [X,Y,Dir,PlayerPid], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -59,12 +59,12 @@ start_link(X,Y,Dir) ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([X,Y, Dir]) ->
+init([X,Y, Dir,PlayerPid]) ->
   X_inc =  - 10 * math:cos( 3.14+(Dir/180)*3.14),
   Y_inc = 10 * math:sin( 3.14+(Dir/180)*3.14),
   erlang:send_after(?INTERVAL, self(), trigger),
 %  loopFire(X,Y,Dir,X_inc,Y_inc),
-  {ok, {X,Y,Dir,X_inc,Y_inc}}.
+  {ok, {X,Y,Dir,X_inc,Y_inc,PlayerPid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -81,7 +81,11 @@ init([X,Y, Dir]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(_Request, _From, State) ->
+handle_call(Request, _From, State) ->
+  case Request of
+    {exit} -> terminate(normal,exploded);
+    true -> ok
+  end,
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -112,20 +116,21 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed}) ->
+handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed,PlayerPid}) ->
   if
     ((X<1300) and (X > -5) and (Y < 768) and (Y>-5)) ->
       gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
       lists:foreach(fun({_Ip,Pid}) ->
         if
-          (Pid /= self()) -> gen_server:call(Pid, {hit,X,Y});
+          (Pid /= PlayerPid) -> gen_server:call(Pid, {hit,X,Y});
           true -> ok
         end
        end, ets:tab2list(ids));
-    true -> terminate(normal,exploded)
+    true ->  supervisor:terminate_child(shell_sup,self())
   end,
+
   erlang:send_after(?INTERVAL, self(), trigger),
-  {noreply, {X+Xspeed,Y+Yspeed,Dir,Xspeed,Yspeed}}.
+  {noreply, {X+Xspeed,Y+Yspeed,Dir,Xspeed,Yspeed,PlayerPid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -169,6 +174,7 @@ loopFire(X,Y,Dir,Xspeed,Yspeed) ->
     if ((X<1024) and (X > 0) and (Y < 768) and (Y>0)) ->
       gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
       loopFire(X + Xspeed,Y + Yspeed,Dir,Xspeed,Yspeed);
-      true -> terminate(normal,exploded)
+      true -> io:format("~nout of range~n"),
+        terminate(normal,exploded)
     end
   end.

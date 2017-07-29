@@ -74,15 +74,7 @@ init([]) ->
   wxFrame:setMenuBar(Frame, MenuBar),
   Panel = wxPanel:new(Frame),
   wxFrame:connect(Panel, paint),
-  Image1 = wxImage:new("Graphics/blueBody.png"),
-  Image2 = wxImage:new("Graphics/circle.png"),
-  Image3 = wxImage:rotate90(Image1),
-  Img = wxImage:rotate(Image2,1.9,{300,300}),
-  B1 = wxImage:new("Graphics/redBody.png"),
-  T1 = wxImage:new("Graphics/redTurret.png"),
   wxFrame:show(Frame),
-  %Tanks = [ {id1, {B1,T1}, {100,100},{0,2},{0,2} }],%,{id2, {B1,T1},{300,300},{5,1},{0,-1}}],
-
   Paint = wxPaintDC:new(Panel),
   Brush1 = wxBrush:new(),
   wxBrush:setColour(Brush1, ?wxBLACK),
@@ -248,6 +240,10 @@ draw_shell(Panel, Xold, Yold, Xnew, Ynew, ShellPic, ErasePic, Dir) ->
   wxDC:drawBitmap(ClientDC, BitmapShellErase, {round(Xold+XoS+45-wxImage:getHeight(Shell)/2), round(Yold+YoS+45-wxImage:getWidth(Shell)/2)}),
   wxDC:drawBitmap(ClientDC, BitmapShell, {round(Xnew+XoS+45-wxImage:getHeight(Shell)/2), round(Ynew+YoS+45-wxImage:getWidth(Shell)/2)}),
   wxClientDC:destroy(ClientDC).
+
+  %TODO: fix the offsets for shell, (hit.miss)
+
+  %TODO: consider changing how long explosion appears
 
 draw_explosion(Panel, X, Y) ->
   ClientDC = wxClientDC:new(Panel),
