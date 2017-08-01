@@ -63,7 +63,7 @@ init([]) ->
   ets:new(ids, [set, named_table, public]),
   io:format("Game Manager Online ~n"),
   erlang:send_after(5000+?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
-  {ok, #state{}}.
+  {ok, 0}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -86,24 +86,29 @@ handle_call({Ip,Request}, _From, State) ->
 
   case Temp2 of
     [PlayerName, "connection","successful"] ->
-      {ok, PID} = player_sup:start_player(PlayerName, Ip),
+      {ok, PID} = player_sup:start_player(PlayerName, Ip, State),
+      NewState = State + 1,
       ets:insert(ids, {Ip, PID});
     ["FIRE"] ->
+      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {fire, Ip});
     ["exit"] ->
+      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       supervisor:terminate_child(player_sup,Pid);
     ["Turret", Angle] ->
+      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
     ["Body", X, Y, Angle] ->
+      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)})
 
   end,
 
-  {reply, ok, State}.
+  {reply, ok, NewState}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -175,6 +180,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-
-%TODO: add randomly generated health packages
-%TODO: add side panel with game stats

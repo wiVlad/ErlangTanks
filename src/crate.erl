@@ -72,7 +72,7 @@ init(_Args) ->
         Quantity = random:uniform(10)
   end,
   erlang:send_after(?CRATE_INTERVAL, self(), trigger),
-  {ok, { random:uniform(?max_x) , random:uniform(?max_y), Type, Quantity}}.
+  {ok, { random:uniform(?max_x - 45) , random:uniform(?max_y - 45), Type, Quantity}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -121,7 +121,7 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(trigger, {X,Y,Type,Quantity}) ->
-  gen_server:cast(gui_server, {crate, X,Y}),
+  gen_server:cast(gui_server, {crate, X,Y, Type}),
   lists:foreach(fun({_Ip,Pid}) -> gen_server:cast(Pid, {crate,X,Y, Type, Quantity, self()}) end, ets:tab2list(ids)),
   erlang:send_after(?CRATE_INTERVAL, self(), trigger),
   {noreply, {X,Y,Type,Quantity}}.

@@ -13,7 +13,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4]).
+-export([start_link/5]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -25,7 +25,7 @@
 
 -define(SERVER, ?MODULE).
 -include("include/ErlangTanks.hrl").
--record(state, {id,bodyIm,turretIm,xPos,yPos,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}).
+-record(state, {id,num, bodyIm,turretIm,xPos,yPos,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}).
 
 %%%===================================================================
 %%% API
@@ -37,10 +37,10 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(Args :: term(), Args :: term(), Args :: term(), Args :: term()) ->
+-spec(start_link(Args :: term(),Args :: term(), Args :: term(), Args :: term(), Args :: term()) ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link(Name,ID,BodyIm,TurretIm) ->
-  gen_server:start_link(?MODULE, [Name,ID,BodyIm,TurretIm], []).
+start_link(Name,Num, ID,BodyIm,TurretIm) ->
+  gen_server:start_link(?MODULE, [Name,Num,ID,BodyIm,TurretIm], []).
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -59,16 +59,17 @@ start_link(Name,ID,BodyIm,TurretIm) ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([_Name, ID,BodyIm,TurretIm]) ->
+init([Name,Num, ID,BodyIm,TurretIm]) ->
   io:format("New Player, ID: ~p ~n", [ID]),
   random:seed(erlang:phash2([node()]),
     erlang:monotonic_time(),
     erlang:unique_integer()),
   NewX = round(random:uniform()*(1080-90)) ,
   NewY = round(random:uniform()*(720-90)) ,
-  %gen_server:call(gui_server, {ID}),
-  gen_server:call(gui_server, {new,BodyIm,TurretIm, NewX,NewY,0}),
-  {ok, #state{id = ID,bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY ,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}}.
+  gen_server:call(gui_server, {grid, Name, Num, 50, 50}),
+  gen_server:call(gui_server, {grid, Num, 50, 50}),
+  gen_server:call(gui_server, {new,Name,BodyIm,TurretIm, NewX,NewY,0}),
+  {ok, #state{id = ID,num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY ,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -86,10 +87,11 @@ init([_Name, ID,BodyIm,TurretIm]) ->
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
-handle_call({fire, ID}, _From, State = #state{ id = ID, xPos = X, yPos = Y, turretDir = Dir, ammo = Ammo}) ->
+handle_call({fire, ID}, _From, State = #state{ id = ID, num = Num, xPos = X, yPos = Y, hitPoints = HP, turretDir = Dir, ammo = Ammo}) ->
   NewAmmo = Ammo - 1,
   if
     (NewAmmo > 0) ->
+      gen_server:call(gui_server, {grid,Num, NewAmmo,HP}),
       shell_sup:start_new_shell(X,Y,Dir,self());
     true -> ok
   end,
@@ -124,11 +126,12 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
   gen_server:call(gui_server, {turret,BodyIm,TurretIm, Xcur, Ycur, EffAngle, BodyAngle}),
   {reply, ok, State#state{turretDir = EffAngle}};
 
-handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
+handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ num = Num, xPos = X, yPos = Y, ammo = Ammo, hitPoints = HP}) ->
   if
     ?inRange(X,ShellX,Y,ShellY) ->
     %((abs((ShellX) - (X+5)) < 30) and (abs((ShellY)-(Y+5))<30)) ->
       HPn = HP - 10,
+      gen_server:call(gui_server, {grid,Num, Ammo,HPn}),
       gen_server:call(gui_server, {explosion, X, Y}),
       timer:apply_after(500,gen_server,call,[gui_server,{background,X,Y,90+30,90+25}]),
       supervisor:terminate_child(shell_sup,From);
@@ -149,23 +152,25 @@ handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ xPos = X, yPos = Y
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
-handle_cast({hit,ShellX,ShellY, From}, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
+handle_cast({hit,ShellX,ShellY, From}, State = #state{ num = Num, ammo = Ammo, xPos = X, yPos = Y, hitPoints = HP}) ->
   if
     ?inRange(X,ShellX,Y,ShellY) ->
-      HPn = HP - 10,
+      HPn = HP - 5,
       gen_server:call(gui_server, {explosion, X, Y}),
       timer:apply_after(500,gen_server,call,[gui_server,{background,X,Y,90+30,90+25}]),
+      gen_server:call(gui_server, {grid,Num, Ammo,HPn}),
       supervisor:terminate_child(shell_sup,From);
+
     true -> HPn = HP
   end,
   {noreply, State#state{ hitPoints = HPn }};
 
-handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ xPos = X, yPos = Y, hitPoints = HP, ammo = Ammo}) ->
+handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ num = Num, xPos = X, yPos = Y, hitPoints = HP, ammo = Ammo}) ->
   if
     ?inRange(X,Xcrate,Y,Ycrate) ->
       if
         (Type == health) -> HPNew = HP + Quantity, AmmoNew = Ammo;
-        (Type == health) -> HPNew = HP, AmmoNew = Ammo + Quantity;
+        (Type == ammo) -> HPNew = HP, AmmoNew = Ammo + Quantity;
         true -> HPNew = HP, AmmoNew = Ammo
       end,
       supervisor:terminate_child(crate_sup,From);
@@ -173,6 +178,7 @@ handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ xPos 
       AmmoNew = Ammo,
       HPNew = HP
   end,
+  gen_server:call(gui_server, {grid,Num, AmmoNew,HPNew}),
   {noreply, State#state{ hitPoints = HPNew, ammo = AmmoNew }};
 
 

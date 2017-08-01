@@ -14,7 +14,7 @@
 %% API
 -export([
   start_link/0,
-  start_player/2
+  start_player/3
   ]).
 
 %% Supervisor callbacks
@@ -86,10 +86,10 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===========================  ========================================
-%TODO: Decide which parameter are passed in player's initialization
-start_player(Name, ID) ->
+
+start_player(Name, ID, Num) ->
   BodyIm = ets:first(colors),
   {_Key,TurretIm} = hd(ets:lookup(colors,BodyIm)),
   ets:delete(colors,BodyIm),
-  Pid = supervisor:start_child(?MODULE, [Name,ID,BodyIm,TurretIm]),
+  Pid = supervisor:start_child(?MODULE, [Name,Num,ID,BodyIm,TurretIm]),
   Pid.

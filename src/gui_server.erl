@@ -26,8 +26,17 @@
 -include_lib("wx/include/wx.hrl").
 -define(max_x,(1000)).
 -define(max_y,(700)).
--record(state, {}).
-
+%-record(state, {}).
+-record(state,
+{
+  parent,
+  config,
+  gl,
+  canvas,
+  image,
+  timer,
+  time
+}).
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -64,16 +73,73 @@ start_link() ->
 init([]) ->
   io:format("GUI Server online ~n"),
   Wx = wx:new(),
-  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1080,720}}]),
+  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1300,720}}]),
   MenuBar = wxMenuBar:new(),
   wxFrame:setMenuBar(Frame, MenuBar),
-  Panel = wxPanel:new(Frame),
+  Panel = wxPanel:new(Frame, [{pos, {0,0}},{size,{1080,720}},{style, ?wxBORDER_DOUBLE}]),
+  Panel2 = wxPanel:new(Frame, [{pos, {1080,0}},{size,{200,720}},{style, ?wxBORDER_DOUBLE}]),
+
+  %% Setup sizers
+  MainSizer = wxBoxSizer:new(?wxVERTICAL),
+  TextSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
+    [{label, "GameManager"}]),
+  ButtonSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
+    [{label, "Initialize"}]),
+  GridSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
+    [{label, "Players"}]),
+
+  %% Create static texts
+  Texts = [wxStaticText:new(Panel2, 1, "Erlang Tanks Game", []),
+    wxStaticText:new(Panel2, 2, "Jonathan and Vlad",
+      [{style, ?wxALIGN_CENTER bor ?wxST_NO_AUTORESIZE}])],
+
+
+  B10 = wxButton:new(Panel2, 10, [{label,"Start"}]),
+  Font = wxFont:new(10, ?wxFONTFAMILY_SWISS,
+    ?wxFONTSTYLE_NORMAL,
+    ?wxFONTWEIGHT_NORMAL, []),
+  Grid = wxGrid:new(Panel2, 2, []),
+  wxGrid:createGrid(Grid, 8, 2),
+  wxGrid:setColLabelValue(Grid, 0, "Ammo"),
+  wxGrid:setColLabelValue(Grid, 1, "Health"),
+  wxGrid:setRowLabelSize(Grid, 55),
+  wxGrid:setLabelFont(Grid, Font),
+  wxGrid:fit(Grid),
+  %% Add to sizers
+  [wxSizer:add(TextSizer, Text, [{flag, ?wxEXPAND bor ?wxALL},
+    {border, 5}]) || Text <- Texts],
+  wxSizer:add(ButtonSizer, B10, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxEXPAND},
+    {border, 5}]),
+  wxSizer:add(GridSizer, Grid, [{flag, ?wxALL},
+    {border, 5},{proportion, 1}]),
+
+  Options = [{flag, ?wxEXPAND}, {proportion, 1}],
+  wxSizer:add(MainSizer, TextSizer, Options),
+  wxSizer:add(MainSizer, ButtonSizer, []),
+  wxSizer:add(MainSizer, GridSizer, [{border, 4}, {flag, ?wxALL}, {proportion, 1}]),
+
+  wxPanel:setSizer(Panel2, MainSizer),
+
+
   wxFrame:connect(Panel, paint),
   wxFrame:show(Frame),
+  %Box = wxStaticBox:new(Panel2, 2,"Game Status",[{pos,{50,0}}]),
+  %Grid = wxGrid:new(Panel2,0,25,[{w,195},{h,695}]),
+  %wxGrid:setRowSize(Grid,8,10),
+  %wxGrid:setColSize(Grid,2,30),
+  %wxStaticBox:setBackgroundColour(Box,?wxBLUE),
+  %Ts = wxBoxSizer:new(?wxHORIZONTAL),
+  %wxSizer:add(Ts,20,20,[]),
+  %Button = wxButton:new(Panel2,-1,"button"),
+  %wxPanel:setSizer(Panel2,Ts),
   wxPanel:setBackgroundColour(Panel,?wxBLACK),
-  wxFrame:setMaxSize(Frame,{1080,720}),
-  wxFrame:setMinSize(Frame,{1080,720}),
-  {ok, {Panel}}.
+  wxPanel:setBackgroundColour(Panel2,?wxLIGHT_GREY),
+  wxFrame:setMaxSize(Frame,{1280,720}),
+  wxFrame:setMinSize(Frame,{1280,720}),
+  {ok, {Panel,Grid}}.
+
+
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -90,9 +156,9 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, _From, {Panel}) ->
+handle_call(Request, _From, {Panel,Grid}) ->
   case Request of
-    {new,BodyIm,TurretIm,PosX,PosY,Angle} ->
+    {new,_PlayerName,BodyIm,TurretIm,PosX,PosY,Angle} ->
       Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
       draw_body(Panel, {PosX,PosY}, Body,Angle),
       draw_turret(Panel, {PosX,PosY},Turret,Angle);
@@ -114,14 +180,18 @@ handle_call(Request, _From, {Panel}) ->
       EraseShell = wxImage:new("Graphics/eraseShell.png"),
       ShellPic = wxImage:new("Graphics/Shell.png"),
       draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir);
-
+    {grid,Name, Num, Ammo, HP} ->
+      wxGrid:setRowLabelValue(Grid, Num, Name);
+    {grid, Num, Ammo, HP} ->
+      wxGrid:setCellValue(Grid, Num, 1,integer_to_list(HP)),
+      wxGrid:setCellValue(Grid, Num, 0,integer_to_list(Ammo) );
     {explosion, X, Y} ->
       draw_explosion(Panel, X, Y);
     {background, X, Y,SizeX,SizeY} ->
       draw_background(Panel, X-15,Y-10, SizeX,SizeY)
 
   end,
-  {reply, ok, {Panel}}.
+  {reply, ok, {Panel,Grid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -134,14 +204,20 @@ handle_call(Request, _From, {Panel}) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_cast(Request, {Panel}) ->
+handle_cast(Request, {Panel,Grid}) ->
   case Request of
+    {crate, X, Y, health} ->
+      CratePic = wxImage:new("Graphics/crateHealth.png"),
+      draw_crate(Panel, X, Y, CratePic);
+    {crate, X, Y, ammo} ->
+      CratePic = wxImage:new("Graphics/crateAmmo.png"),
+      draw_crate(Panel, X, Y, CratePic);
     {shell, X, Y, NewX,NewY,Dir} ->
       EraseShell = wxImage:new("Graphics/eraseShell.png"),
       ShellPic = wxImage:new("Graphics/Shell.png"),
       draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir)
   end,
-  {noreply, {Panel}}.
+  {noreply, {Panel,Grid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -233,15 +309,17 @@ draw_shell(Panel, Xold, Yold, Xnew, Ynew, ShellPic, ErasePic, Dir) ->
   wxDC:drawBitmap(ClientDC, BitmapShell, {round(Xnew+XoS+45-wxImage:getHeight(Shell)/2), round(Ynew+YoS+45-wxImage:getWidth(Shell)/2)}),
   wxClientDC:destroy(ClientDC).
 
-  %TODO: fix the offsets for shell, (hit.miss)
-
-  %TODO: consider changing how long explosion appears
-
 draw_explosion(Panel, X, Y) ->
   ClientDC = wxClientDC:new(Panel),
   Img = wxImage:new("Graphics/explosion.png"),
   Bitmap = wxBitmap:new(Img),
   wxDC:drawBitmap(ClientDC, Bitmap, {round(X+45-wxImage:getHeight(Img)/2), round(Y-15+60-wxImage:getWidth(Img)/2)}),
   wx_misc:bell(),
+  wxBitmap:destroy(Bitmap),
+  wxClientDC:destroy(ClientDC).
+draw_crate(Panel, X, Y, Pic)->
+  ClientDC = wxClientDC:new(Panel),
+  Bitmap = wxBitmap:new(Pic),
+  wxDC:drawBitmap(ClientDC, Bitmap, {round(X+45-wxImage:getHeight(Pic)/2), round(Y-15+60-wxImage:getWidth(Pic)/2)}),
   wxBitmap:destroy(Bitmap),
   wxClientDC:destroy(ClientDC).

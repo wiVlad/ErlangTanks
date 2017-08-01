@@ -76,6 +76,6 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-%TODO: Decide which parameter are passed in shell's initialization
+
 start_new_shell(X,Y,Dir,PlayerPid) ->
   supervisor:start_child(?MODULE, [X,Y,Dir,PlayerPid]).
