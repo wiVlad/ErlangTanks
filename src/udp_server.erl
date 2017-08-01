@@ -29,16 +29,16 @@ handle_cast(stop, {Connections, Sock}) ->
 
 handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
   Temp = re:split(Msg, "[ ]",[{return,list}]),
+  io:format("~p ~n",[Temp]),
   case Temp of
     [_PlayerName, "connection","successful"] ->
-      gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("connected")),
       NewConnections = [Ip|Connections];
     ["exit"]  ->
       NewConnections = lists:delete(Ip,Connections),
       io:format("~n ~p has left the room~n", [Ip]);
     _A -> NewConnections = Connections
   end,
-  gen_server:call(game_manager, {Ip,Msg}),
+  gen_server:call(game_manager, {Sock,Ip,Msg}),
   {noreply, {NewConnections,Sock}};
 
 handle_info(Msg, LoopData) ->
@@ -49,10 +49,15 @@ send(Msg) ->
 
   gen_server:call(?MODULE, {message, Msg}).
 
-handle_call(Request, _From, {Connections,Sock}) ->%{server,Sock}) ->
-  io:format("received exit, sending exit ~p~n", [Request]),
+handle_call(exit, _From, {Connections,Sock}) ->
   %io:format(gen_udp:send(Sock, "192.168.14.166", 4000,  list_to_binary("exit"))),
   lists:foreach(fun(A) ->
     gen_udp:send(Sock, A, ?SERVER_PORT, list_to_binary("exit"))
                 end, Connections),
-  {reply, ok, {[],Sock}}.
+  {reply, ok, {[],Sock}};
+
+handle_call({exit,Ip}, _From, {Connections,Sock}) ->
+  io:format("trying to send kill"),
+  NewConnections = lists:delete(Ip,Connections),
+  gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("exit")),
+  {reply, ok, {NewConnections,Sock}}.

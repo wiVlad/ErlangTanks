@@ -83,7 +83,7 @@ init([]) ->
   MainSizer = wxBoxSizer:new(?wxVERTICAL),
   TextSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
     [{label, "About"}]),
-  ButtonSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
+  ButtonSizer = wxStaticBoxSizer:new(?wxHORIZONTAL, Panel2,
     [{label, "Initialize"}]),
   GridSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
     [{label, "Stats"}]),
@@ -94,7 +94,11 @@ init([]) ->
       [{style, ?wxALIGN_CENTER bor ?wxST_NO_AUTORESIZE}])],
 
 
-  B10 = wxButton:new(Panel2, 10, [{label,"Start"}]),
+  B_Start = wxButton:new(Panel2, 1, [{label,"Start"}]),
+  B_Quit = wxButton:new(Panel2, 2, [{label,"Quit"}]),
+  wxWindow:connect(Panel2, command_button_clicked),
+
+
   Font = wxFont:new(10, ?wxFONTFAMILY_SWISS,
     ?wxFONTSTYLE_NORMAL,
     ?wxFONTWEIGHT_NORMAL, []),
@@ -109,12 +113,16 @@ init([]) ->
   %% Add to sizers
   [wxSizer:add(TextSizer, Text, [{flag, ?wxEXPAND bor ?wxALL},
     {border, 5}]) || Text <- Texts],
-  wxSizer:add(ButtonSizer, B10, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxEXPAND},
+  wxSizer:add(ButtonSizer, B_Start, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxEXPAND},
+    {border, 5}]),
+  wxSizer:add(ButtonSizer, B_Quit, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxEXPAND},
     {border, 5}]),
   wxSizer:add(GridSizer, Grid, [{flag, ?wxALL},
     {border, 5},{proportion, 1}]),
 
   Options = [{flag, ?wxEXPAND}, {proportion, 1}],
+
+
   wxSizer:add(MainSizer, TextSizer, Options),
   wxSizer:add(MainSizer, ButtonSizer, []),
   wxSizer:add(MainSizer, GridSizer, [{border, 4}, {flag, ?wxALL}, {proportion, 1}]),
@@ -236,7 +244,19 @@ handle_cast(Request, {Panel,Grid}) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(_Info, State) ->
+
+handle_info({wx,1,_A,_B,_C}, State) ->
+  io:format("STRAT!~n"),
+  gen_server:cast(game_manager,startGame),
+  {noreply, State};
+
+handle_info({wx,2,_A,_B,_C}, State) ->
+  io:format("QUIT!"),
+  tanks_app:stop(0),
+  {noreply, State};
+
+handle_info(Info, State) ->
+  io:format("Got: ~p~n",[Info]),
   {noreply, State}.
 
 %%--------------------------------------------------------------------

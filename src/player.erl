@@ -70,7 +70,7 @@ init([Name,Num, ID,BodyIm,TurretIm]) ->
   gen_server:call(gui_server, {grid, Num, 50, 50}),
   gen_server:call(gui_server, {grid, Num, 0}),
   gen_server:call(gui_server, {new,Name,BodyIm,TurretIm, NewX,NewY,0}),
-  {ok, #state{id = ID,num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY ,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}}.
+  {ok, #state{id = ID,num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -141,7 +141,7 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
-handle_cast({hit,ShellX,ShellY, From, PlayerPid}, State = #state{ score = Score, num = Num, ammo = Ammo, xPos = X, yPos = Y, hitPoints = HP}) ->
+handle_cast({hit,ShellX,ShellY, From, PlayerPid}, State = #state{ id = ID, score = Score, num = Num, ammo = Ammo, xPos = X, yPos = Y, hitPoints = HP}) ->
   if
     ?inRange(X,ShellX,Y,ShellY) ->
       HPn = HP - 5,
@@ -154,7 +154,9 @@ handle_cast({hit,ShellX,ShellY, From, PlayerPid}, State = #state{ score = Score,
   end,
   if
     (HPn < 1) ->  gen_server:cast(PlayerPid, {score}),
-                  supervisor:terminate_child(player_sup,self());
+      io:format("~nplayer ~p terminated~n",[ID]),
+      gen_server:call(udp_server, {exit,ID}),
+      supervisor:terminate_child(player_sup,self());
     true -> ok
   end,
   {noreply, State#state{ hitPoints = HPn }};
@@ -175,7 +177,7 @@ handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ num =
   gen_server:call(gui_server, {grid,Num, AmmoNew,HPNew}),
   {noreply, State#state{ hitPoints = HPNew, ammo = AmmoNew }};
 
-handle_cast({score, Score}, State = #state{ score = Score, num = Num, xPos = X, yPos = Y, hitPoints = HP, ammo = Ammo}) ->
+handle_cast({score}, State = #state{ score = Score, num = Num, xPos = X, yPos = Y, hitPoints = HP, ammo = Ammo}) ->
 
   gen_server:call(gui_server, {grid,Num, Score+1}),
   {noreply, State#state{ score = Score + 1 }};
@@ -197,6 +199,10 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
+handle_info(trigger, State = #state{ bodyDir = BodyAngle,turretDir = TurretAngle ,bodyIm = BodyIm,turretIm = TurretIm, xPos = X, yPos = Y}) ->
+  gen_server:call(gui_server, {body,BodyIm,TurretIm, X, Y, X,Y,BodyAngle, TurretAngle}),
+  erlang:send_after(?CRATE_INTERVAL, self(), trigger),
+  {noreply, State};
 handle_info(_Info, State) ->
   {noreply, State}.
 

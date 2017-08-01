@@ -23,7 +23,7 @@
   code_change/3]).
 -include("include/ErlangTanks.hrl").
 -define(SERVER, game_manager).
--record(state, {}).
+-record(state, { numOfPlayers = 0, gameInProgress = false }).
 
 %%%===================================================================
 %%% API
@@ -62,8 +62,7 @@ start_link() ->
 init([]) ->
   ets:new(ids, [set, named_table, public]),
   io:format("Game Manager Online ~n"),
-  erlang:send_after(5000+?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
-  {ok, 0}.
+  {ok, #state{gameInProgress = false, numOfPlayers =  0}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -80,35 +79,42 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call({Ip,Request}, _From, State) ->
+handle_call({_Sock,Ip,Request}, _From, State = #state{gameInProgress = true, numOfPlayers =  Num}) ->
 
-  Temp2 = re:split(Request, "[ ]",[{return,list}]),
+  Msg = re:split(Request, "[ ]",[{return,list}]),
 
-  case Temp2 of
-    [PlayerName, "connection","successful"] ->
-      {ok, PID} = player_sup:start_player(PlayerName, Ip, State),
-      NewState = State + 1,
-      ets:insert(ids, {Ip, PID});
+  case Msg of
+    [_PlayerName, "connection","successful"] ->
+      ok;
     ["FIRE"] ->
-      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {fire, Ip});
     ["exit"] ->
-      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       supervisor:terminate_child(player_sup,Pid);
     ["Turret", Angle] ->
-      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
     ["Body", X, Y, Angle] ->
-      NewState = State,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)})
 
   end,
 
-  {reply, ok, NewState}.
+  {reply, ok, State};
+
+handle_call({Sock,Ip,Request}, _From, State = #state{gameInProgress = false, numOfPlayers =  Num}) ->
+  Msg = re:split(Request, "[ ]",[{return,list}]),
+
+  case Msg of
+    [PlayerName, "connection","successful"] ->
+      {ok, PID} = player_sup:start_player(PlayerName, Ip, Num),
+      gen_udp:send(Sock, Ip, 4000, list_to_binary("connected")),
+      NewNum = Num + 1,
+      ets:insert(ids, {Ip, PID});
+    _Any -> NewNum = Num
+  end,
+  {reply, ok, State#state{numOfPlayers = NewNum}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -121,6 +127,12 @@ handle_call({Ip,Request}, _From, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
+
+handle_cast(_Request, State = #state{gameInProgress = false}) ->
+  io:format("Game manager ack start ~n"),
+  erlang:send_after(5000+?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
+  {noreply, State#state{gameInProgress = true}};
+
 handle_cast(_Request, State) ->
   {noreply, State}.
 
@@ -143,6 +155,7 @@ handle_info(crateTrigger, State) ->
   crate_sup:start_new_crate(),
   erlang:send_after(?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
   {noreply, State};
+
 
 handle_info(_Info, State) ->
   {noreply, State}.
