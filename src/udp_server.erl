@@ -38,7 +38,7 @@ handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
       io:format("~n ~p has left the room~n", [Ip]);
     _A -> NewConnections = Connections
   end,
-  gen_server:call(main_server, {Ip,Msg}),
+  gen_server:call(game_manager, {Ip,Msg}),
   {noreply, {NewConnections,Sock}};
 
 handle_info(Msg, LoopData) ->

@@ -1,13 +1,13 @@
 %%%-------------------------------------------------------------------
-%%% @author jon
+%%% @author vlad
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
 %%%
 %%% @end
-%%% Created : 24. Jun 2017 17:50
+%%% Created : 01. Aug 2017 10:08 AM
 %%%-------------------------------------------------------------------
--module(server).
--author("jon").
+-module(crate).
+-author("vlad").
 
 -behaviour(gen_server).
 
@@ -22,7 +22,9 @@
   terminate/2,
   code_change/3]).
 
--define(SERVER, main_server).
+-define(SERVER, ?MODULE).
+
+-include("include/ErlangTanks.hrl").
 -record(state, {}).
 
 %%%===================================================================
@@ -38,8 +40,8 @@
 -spec(start_link() ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
-  %gen_server is registered under the name "main_server"
+  io:format("crate start link~n"),
+  gen_server:start_link(?MODULE, [0], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -59,10 +61,18 @@ start_link() ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([]) ->
-  ets:new(ids, [set, named_table, public]),
-  io:format("General Server online ~n"),
-  {ok, #state{}}.
+init(_Args) ->
+  random:seed(erlang:phash2([node()]), erlang:monotonic_time(), erlang:unique_integer()),
+  TypesList =[health,ammo],
+  Type = lists:nth(random:uniform(length(TypesList)),TypesList),
+  case Type of
+     health ->
+        Quantity = random:uniform(20);
+      ammo ->
+        Quantity = random:uniform(10)
+  end,
+  erlang:send_after(?CRATE_INTERVAL, self(), trigger),
+  {ok, { random:uniform(?max_x) , random:uniform(?max_y), Type, Quantity}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -79,29 +89,7 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call({Ip,Request}, _From, State) ->
-
-  Temp2 = re:split(Request, "[ ]",[{return,list}]),
-
-  case Temp2 of
-    [PlayerName, "connection","successful"] ->
-      {ok, PID} = player_sup:start_player(PlayerName, Ip),
-      ets:insert(ids, {Ip, PID});
-    ["FIRE"] ->
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      gen_server:call(Pid, {fire, Ip});
-    ["exit"] ->
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      supervisor:terminate_child(player_sup,Pid);
-    ["Turret", Angle] ->
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
-    ["Body", X, Y, Angle] ->
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)})
-
-  end,
-
+handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -132,8 +120,11 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(_Info, State) ->
-  {noreply, State}.
+handle_info(trigger, {X,Y,Type,Quantity}) ->
+  gen_server:cast(gui_server, {crate, X,Y}),
+  lists:foreach(fun({_Ip,Pid}) -> gen_server:cast(Pid, {crate,X,Y, Type, Quantity, self()}) end, ets:tab2list(ids)),
+  erlang:send_after(?CRATE_INTERVAL, self(), trigger),
+  {noreply, {X,Y,Type,Quantity}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -150,6 +141,7 @@ handle_info(_Info, State) ->
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
   ok.
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -167,7 +159,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-
-%TODO: add randomly generated health packages
-%TODO: add side panel with game stats

@@ -4,15 +4,15 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created : 05. Jul 2017 21:14
+%%% Created : 24. Jun 2017 17:50
 %%%-------------------------------------------------------------------
--module(shell_server).
+-module(game_manager).
 -author("jon").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/4]).
+-export([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -21,9 +21,8 @@
   handle_info/2,
   terminate/2,
   code_change/3]).
-
--define(SERVER, ?MODULE).
 -include("include/ErlangTanks.hrl").
+-define(SERVER, game_manager).
 -record(state, {}).
 
 %%%===================================================================
@@ -36,10 +35,11 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link(Args :: term(), Args :: term(), Args :: term(), Args :: term()) ->
+-spec(start_link() ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link(X,Y,Dir,PlayerPid) ->
-  gen_server:start_link(?MODULE, [X,Y,Dir,PlayerPid], []).
+start_link() ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+  %gen_server is registered under the name "main_server"
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -59,11 +59,11 @@ start_link(X,Y,Dir,PlayerPid) ->
 -spec(init(Args :: term()) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init([X,Y, Dir,PlayerPid]) ->
-  X_inc =  - 10 * math:cos( 3.14+(Dir/180)*3.14),
-  Y_inc = 10 * math:sin( 3.14+(Dir/180)*3.14),
-  erlang:send_after(?SHELL_INTERVAL, self(), trigger),
-  {ok, {X,Y,Dir,X_inc,Y_inc,PlayerPid}}.
+init([]) ->
+  ets:new(ids, [set, named_table, public]),
+  io:format("Game Manager Online ~n"),
+  erlang:send_after(5000+?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
+  {ok, #state{}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -80,11 +80,29 @@ init([X,Y, Dir,PlayerPid]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, _From, State) ->
-  case Request of
-    {exit} -> terminate(normal,exploded);
-    true -> ok
+handle_call({Ip,Request}, _From, State) ->
+
+  Temp2 = re:split(Request, "[ ]",[{return,list}]),
+
+  case Temp2 of
+    [PlayerName, "connection","successful"] ->
+      {ok, PID} = player_sup:start_player(PlayerName, Ip),
+      ets:insert(ids, {Ip, PID});
+    ["FIRE"] ->
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      gen_server:call(Pid, {fire, Ip});
+    ["exit"] ->
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      supervisor:terminate_child(player_sup,Pid);
+    ["Turret", Angle] ->
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
+    ["Body", X, Y, Angle] ->
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)})
+
   end,
+
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -115,21 +133,14 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed,PlayerPid}) ->
-  if
-    ((X<2000) and (X > -1000) and (Y < 1500) and (Y>-1000)) ->
-      gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
-      lists:foreach(fun({_Ip,Pid}) ->
-        if
-          (Pid /= PlayerPid) -> gen_server:cast(Pid, {hit,X,Y, self()});
-          true -> ok
-        end
-       end, ets:tab2list(ids));
-    true ->  supervisor:terminate_child(shell_sup,self())
-  end,
 
-  erlang:send_after(?SHELL_INTERVAL, self(), trigger),
-  {noreply, {X+Xspeed,Y+Yspeed,Dir,Xspeed,Yspeed,PlayerPid}}.
+handle_info(crateTrigger, State) ->
+  crate_sup:start_new_crate(),
+  erlang:send_after(?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
+  {noreply, State};
+
+handle_info(_Info, State) ->
+  {noreply, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -146,7 +157,6 @@ handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed,PlayerPid}) ->
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
   ok.
-
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -160,3 +170,11 @@ terminate(_Reason, _State) ->
   {ok, NewState :: #state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+
+
+%TODO: add randomly generated health packages
+%TODO: add side panel with game stats

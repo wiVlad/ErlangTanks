@@ -1,4 +1,4 @@
-  %%%-------------------------------------------------------------------
+%%%-------------------------------------------------------------------
 %%% @author vlad
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
@@ -6,19 +6,20 @@
 %%% @end
 %%% Created : 07. Jul 2017 10:12 AM
 %%%-------------------------------------------------------------------
--module(game_sup).
+-module(crate_sup).
 -author("vlad").
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([
+  start_link/0,
+  start_new_crate/0
+]).
 
 %% Supervisor callbacks
 -export([init/1]).
-
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-include("include/ErlangTanks.hrl").
 -define(SERVER, ?MODULE).
 
 %%%===================================================================
@@ -57,21 +58,24 @@ start_link() ->
   }} |
   ignore |
   {error, Reason :: term()}).
+
 init([]) ->
-  RestartStrategy = one_for_one,
+  RestartStrategy = simple_one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
+  Restart = permanent,
+  Shutdown = 2000,
+  Type = worker,
 
-  Children = [
-    ?CHILD(shell_sup, supervisor),
-    ?CHILD(player_sup, supervisor),
-    ?CHILD(crate_sup, supervisor),
-    ?CHILD(gui_server, worker),
-    ?CHILD(udp_server, worker),
-    ?CHILD(game_manager, supervisor)],
-  {ok, {SupFlags, Children}}.
+  AChild = {'?MODULE', {'crate', start_link, []},
+    Restart, Shutdown, Type, ['crate']},
+  io:format("Crate Supervisor online ~n"),
+  {ok, {SupFlags, [AChild]}}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+start_new_crate() ->
+  supervisor:start_child(?MODULE, []).
+

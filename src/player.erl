@@ -24,9 +24,7 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(max_x,(1024)).
--define(max_y,(768)).
-
+-include("include/ErlangTanks.hrl").
 -record(state, {id,bodyIm,turretIm,xPos,yPos,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}).
 
 %%%===================================================================
@@ -128,7 +126,8 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
 
 handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
   if
-    ((abs((ShellX) - (X+5)) < 30) and (abs((ShellY)-(Y+5))<30)) ->
+    ?inRange(X,ShellX,Y,ShellY) ->
+    %((abs((ShellX) - (X+5)) < 30) and (abs((ShellY)-(Y+5))<30)) ->
       HPn = HP - 10,
       gen_server:call(gui_server, {explosion, X, Y}),
       timer:apply_after(500,gen_server,call,[gui_server,{background,X,Y,90+30,90+25}]),
@@ -149,6 +148,34 @@ handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ xPos = X, yPos = Y
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
+
+handle_cast({hit,ShellX,ShellY, From}, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
+  if
+    ?inRange(X,ShellX,Y,ShellY) ->
+      HPn = HP - 10,
+      gen_server:call(gui_server, {explosion, X, Y}),
+      timer:apply_after(500,gen_server,call,[gui_server,{background,X,Y,90+30,90+25}]),
+      supervisor:terminate_child(shell_sup,From);
+    true -> HPn = HP
+  end,
+  {noreply, State#state{ hitPoints = HPn }};
+
+handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ xPos = X, yPos = Y, hitPoints = HP, ammo = Ammo}) ->
+  if
+    ?inRange(X,Xcrate,Y,Ycrate) ->
+      if
+        (Type == health) -> HPNew = HP + Quantity, AmmoNew = Ammo;
+        (Type == health) -> HPNew = HP, AmmoNew = Ammo + Quantity;
+        true -> HPNew = HP, AmmoNew = Ammo
+      end,
+      supervisor:terminate_child(crate_sup,From);
+    true ->
+      AmmoNew = Ammo,
+      HPNew = HP
+  end,
+  {noreply, State#state{ hitPoints = HPNew, ammo = AmmoNew }};
+
+
 handle_cast(_Request, State) ->
   {noreply, State}.
 
