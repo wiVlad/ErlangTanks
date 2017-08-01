@@ -121,7 +121,7 @@ handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed,PlayerPid}) ->
       gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
       lists:foreach(fun({_Ip,Pid}) ->
         if
-          (Pid /= PlayerPid) -> gen_server:cast(Pid, {hit,X,Y, self()});
+          (Pid /= PlayerPid) -> gen_server:cast(Pid, {hit,X,Y, self(), PlayerPid});
           true -> ok
         end
        end, ets:tab2list(ids));

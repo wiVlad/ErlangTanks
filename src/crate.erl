@@ -40,7 +40,6 @@
 -spec(start_link() ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
-  io:format("crate start link~n"),
   gen_server:start_link(?MODULE, [0], []).
 
 %%%===================================================================
@@ -122,7 +121,8 @@ handle_cast(_Request, State) ->
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(trigger, {X,Y,Type,Quantity}) ->
   gen_server:cast(gui_server, {crate, X,Y, Type}),
-  lists:foreach(fun({_Ip,Pid}) -> gen_server:cast(Pid, {crate,X,Y, Type, Quantity, self()}) end, ets:tab2list(ids)),
+  SendTo = ets:tab2list(ids),
+  lists:foreach(fun({_Ip,Pid}) -> gen_server:cast(Pid, {crate,X,Y, Type, Quantity, self()}) end, SendTo),
   erlang:send_after(?CRATE_INTERVAL, self(), trigger),
   {noreply, {X,Y,Type,Quantity}}.
 

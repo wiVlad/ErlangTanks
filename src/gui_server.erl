@@ -73,20 +73,20 @@ start_link() ->
 init([]) ->
   io:format("GUI Server online ~n"),
   Wx = wx:new(),
-  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1300,720}}]),
+  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1366,720}}]),
   MenuBar = wxMenuBar:new(),
   wxFrame:setMenuBar(Frame, MenuBar),
   Panel = wxPanel:new(Frame, [{pos, {0,0}},{size,{1080,720}},{style, ?wxBORDER_DOUBLE}]),
-  Panel2 = wxPanel:new(Frame, [{pos, {1080,0}},{size,{200,720}},{style, ?wxBORDER_DOUBLE}]),
+  Panel2 = wxPanel:new(Frame, [{pos, {1080,0}},{size,{286,720}},{style, ?wxBORDER_DOUBLE}]),
 
   %% Setup sizers
   MainSizer = wxBoxSizer:new(?wxVERTICAL),
   TextSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
-    [{label, "GameManager"}]),
+    [{label, "About"}]),
   ButtonSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
     [{label, "Initialize"}]),
   GridSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
-    [{label, "Players"}]),
+    [{label, "Stats"}]),
 
   %% Create static texts
   Texts = [wxStaticText:new(Panel2, 1, "Erlang Tanks Game", []),
@@ -99,9 +99,10 @@ init([]) ->
     ?wxFONTSTYLE_NORMAL,
     ?wxFONTWEIGHT_NORMAL, []),
   Grid = wxGrid:new(Panel2, 2, []),
-  wxGrid:createGrid(Grid, 8, 2),
+  wxGrid:createGrid(Grid, 8, 3),
   wxGrid:setColLabelValue(Grid, 0, "Ammo"),
   wxGrid:setColLabelValue(Grid, 1, "Health"),
+  wxGrid:setColLabelValue(Grid, 2, "Score"),
   wxGrid:setRowLabelSize(Grid, 55),
   wxGrid:setLabelFont(Grid, Font),
   wxGrid:fit(Grid),
@@ -134,8 +135,8 @@ init([]) ->
   %wxPanel:setSizer(Panel2,Ts),
   wxPanel:setBackgroundColour(Panel,?wxBLACK),
   wxPanel:setBackgroundColour(Panel2,?wxLIGHT_GREY),
-  wxFrame:setMaxSize(Frame,{1280,720}),
-  wxFrame:setMinSize(Frame,{1280,720}),
+  wxFrame:setMaxSize(Frame,{1366,720}),
+  wxFrame:setMinSize(Frame,{1366,720}),
   {ok, {Panel,Grid}}.
 
 
@@ -182,6 +183,8 @@ handle_call(Request, _From, {Panel,Grid}) ->
       draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir);
     {grid,Name, Num, Ammo, HP} ->
       wxGrid:setRowLabelValue(Grid, Num, Name);
+    {grid, Num, Score} ->
+      wxGrid:setCellValue(Grid, Num, 2,integer_to_list(Score));
     {grid, Num, Ammo, HP} ->
       wxGrid:setCellValue(Grid, Num, 1,integer_to_list(HP)),
       wxGrid:setCellValue(Grid, Num, 0,integer_to_list(Ammo) );

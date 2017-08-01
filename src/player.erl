@@ -25,7 +25,7 @@
 
 -define(SERVER, ?MODULE).
 -include("include/ErlangTanks.hrl").
--record(state, {id,num, bodyIm,turretIm,xPos,yPos,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}).
+-record(state, {id,num, bodyIm,turretIm,xPos,yPos,score = 0,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 50}).
 
 %%%===================================================================
 %%% API
@@ -68,6 +68,7 @@ init([Name,Num, ID,BodyIm,TurretIm]) ->
   NewY = round(random:uniform()*(720-90)) ,
   gen_server:call(gui_server, {grid, Name, Num, 50, 50}),
   gen_server:call(gui_server, {grid, Num, 50, 50}),
+  gen_server:call(gui_server, {grid, Num, 0}),
   gen_server:call(gui_server, {new,Name,BodyIm,TurretIm, NewX,NewY,0}),
   {ok, #state{id = ID,num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY ,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}}.
 
@@ -88,12 +89,12 @@ init([Name,Num, ID,BodyIm,TurretIm]) ->
   {stop, Reason :: term(), NewState :: #state{}}).
 
 handle_call({fire, ID}, _From, State = #state{ id = ID, num = Num, xPos = X, yPos = Y, hitPoints = HP, turretDir = Dir, ammo = Ammo}) ->
-  NewAmmo = Ammo - 1,
   if
-    (NewAmmo > 0) ->
+    (Ammo > 0) ->
+      NewAmmo = Ammo - 1,
       gen_server:call(gui_server, {grid,Num, NewAmmo,HP}),
       shell_sup:start_new_shell(X,Y,Dir,self());
-    true -> ok
+    true -> NewAmmo = 0
   end,
 
   {reply, ok, State#state{ ammo = NewAmmo }};
@@ -115,6 +116,7 @@ handle_call({moveBody,ID ,Xspeed, Yspeed,Angle}, _From, State = #state{ id = ID,
     EffAngle =  BodyAngle;
     true -> EffAngle = Angle
   end,
+
   gen_server:call(gui_server, {body,BodyIm,TurretIm, Xcur, Ycur, NewX,NewY,EffAngle, TurretAngle}),
   {reply, ok, State#state{ xPos = NewX, yPos = NewY, bodyDir = EffAngle}};
 
@@ -124,20 +126,7 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
     true -> EffAngle = Angle
   end,
   gen_server:call(gui_server, {turret,BodyIm,TurretIm, Xcur, Ycur, EffAngle, BodyAngle}),
-  {reply, ok, State#state{turretDir = EffAngle}};
-
-handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ num = Num, xPos = X, yPos = Y, ammo = Ammo, hitPoints = HP}) ->
-  if
-    ?inRange(X,ShellX,Y,ShellY) ->
-    %((abs((ShellX) - (X+5)) < 30) and (abs((ShellY)-(Y+5))<30)) ->
-      HPn = HP - 10,
-      gen_server:call(gui_server, {grid,Num, Ammo,HPn}),
-      gen_server:call(gui_server, {explosion, X, Y}),
-      timer:apply_after(500,gen_server,call,[gui_server,{background,X,Y,90+30,90+25}]),
-      supervisor:terminate_child(shell_sup,From);
-    true -> HPn = HP
-  end,
-  {reply, ok, State#state{ hitPoints = HPn }}.
+  {reply, ok, State#state{turretDir = EffAngle}}.
 
 
 %%--------------------------------------------------------------------
@@ -152,7 +141,7 @@ handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ num = Num, xPos = 
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
-handle_cast({hit,ShellX,ShellY, From}, State = #state{ num = Num, ammo = Ammo, xPos = X, yPos = Y, hitPoints = HP}) ->
+handle_cast({hit,ShellX,ShellY, From, PlayerPid}, State = #state{ score = Score, num = Num, ammo = Ammo, xPos = X, yPos = Y, hitPoints = HP}) ->
   if
     ?inRange(X,ShellX,Y,ShellY) ->
       HPn = HP - 5,
@@ -162,6 +151,11 @@ handle_cast({hit,ShellX,ShellY, From}, State = #state{ num = Num, ammo = Ammo, x
       supervisor:terminate_child(shell_sup,From);
 
     true -> HPn = HP
+  end,
+  if
+    (HPn < 1) ->  gen_server:cast(PlayerPid, {score}),
+                  supervisor:terminate_child(player_sup,self());
+    true -> ok
   end,
   {noreply, State#state{ hitPoints = HPn }};
 
@@ -181,6 +175,10 @@ handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ num =
   gen_server:call(gui_server, {grid,Num, AmmoNew,HPNew}),
   {noreply, State#state{ hitPoints = HPNew, ammo = AmmoNew }};
 
+handle_cast({score, Score}, State = #state{ score = Score, num = Num, xPos = X, yPos = Y, hitPoints = HP, ammo = Ammo}) ->
+
+  gen_server:call(gui_server, {grid,Num, Score+1}),
+  {noreply, State#state{ score = Score + 1 }};
 
 handle_cast(_Request, State) ->
   {noreply, State}.

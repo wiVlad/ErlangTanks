@@ -161,6 +161,7 @@ handle_info(_Info, State) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
+  ets:delete(ids),
   ok.
 %%--------------------------------------------------------------------
 %% @private
