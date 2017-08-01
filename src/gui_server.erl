@@ -63,25 +63,16 @@ start_link() ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   io:format("GUI Server online ~n"),
-  %ets:new(colors, [set, named_table]),
-  %ets:insert(colors, [{"Graphics/redBody.png","Graphics/redTurret.png"},
-  %  {"Graphics/blueBody.png","Graphics/blueTurret.png"},
-  %  {"Graphics/cyanBody.png","Graphics/cyanTurret.png"},
-  %  {"Graphics/greenBody.png","Graphics/greenTurret.png"}]),
   Wx = wx:new(),
-  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [{size, {?max_x, ?max_y}}]),
+  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1080,720}}]),
   MenuBar = wxMenuBar:new(),
   wxFrame:setMenuBar(Frame, MenuBar),
   Panel = wxPanel:new(Frame),
   wxFrame:connect(Panel, paint),
   wxFrame:show(Frame),
-  Paint = wxPaintDC:new(Panel),
-  Brush1 = wxBrush:new(),
-  wxBrush:setColour(Brush1, ?wxBLACK),
-  wxDC:setBrush(Paint,Brush1),
-  wxDC:drawRectangle(Paint,{0,0,?max_x,?max_y}),
-  wxBrush:destroy(Brush1),
-  wxPaintDC:destroy(Paint),
+  wxPanel:setBackgroundColour(Panel,?wxBLACK),
+  wxFrame:setMaxSize(Frame,{1080,720}),
+  wxFrame:setMinSize(Frame,{1080,720}),
   {ok, {Panel}}.
 
 %%--------------------------------------------------------------------
@@ -125,8 +116,9 @@ handle_call(Request, _From, {Panel}) ->
       draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir);
 
     {explosion, X, Y} ->
-      draw_explosion(Panel, X, Y)
-
+      draw_explosion(Panel, X, Y);
+    {background, X, Y,SizeX,SizeY} ->
+      draw_background(Panel, X-15,Y-10, SizeX,SizeY)
 
   end,
   {reply, ok, {Panel}}.
@@ -250,5 +242,6 @@ draw_explosion(Panel, X, Y) ->
   Img = wxImage:new("Graphics/explosion.png"),
   Bitmap = wxBitmap:new(Img),
   wxDC:drawBitmap(ClientDC, Bitmap, {round(X+45-wxImage:getHeight(Img)/2), round(Y-15+60-wxImage:getWidth(Img)/2)}),
+  wx_misc:bell(),
   wxBitmap:destroy(Bitmap),
   wxClientDC:destroy(ClientDC).

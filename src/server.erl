@@ -85,21 +85,21 @@ handle_call({Ip,Request}, _From, State) ->
 
   case Temp2 of
     [PlayerName, "connection","successful"] ->
-      %gen_server:call(gui_server, {Ip}),
       {ok, PID} = player_sup:start_player(PlayerName, Ip),
       ets:insert(ids, {Ip, PID});
     ["FIRE"] ->
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {fire, Ip});
+    ["exit"] ->
+      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      supervisor:terminate_child(player_sup,Pid);
     ["Turret", Angle] ->
-     % gen_server:call(gui_server, {Ip, list_to_integer(Angle)});
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
     ["Body", X, Y, Angle] ->
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)})
-     % gen_server:call(gui_server, {Ip, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)})
-      %gui_pid ! {PlayerName, list_to_integer(X), list_to_integer(Y), list_to_integer(Angle)}
+
   end,
 
   {reply, ok, State}.

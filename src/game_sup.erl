@@ -70,7 +70,6 @@ init([]) ->
     ?CHILD(gui_server, worker),
     ?CHILD(udp_server, worker),
     ?CHILD(server, supervisor)],
-
   {ok, {SupFlags, Children}}.
 
 %%%===================================================================

@@ -33,6 +33,9 @@ handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
     [_PlayerName, "connection","successful"] ->
       gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("connected")),
       NewConnections = [Ip|Connections];
+    ["exit"]  ->
+      NewConnections = lists:delete(Ip,Connections),
+      io:format("~n ~p has left the room~n", [Ip]);
     _A -> NewConnections = Connections
   end,
   gen_server:call(main_server, {Ip,Msg}),

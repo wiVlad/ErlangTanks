@@ -66,8 +66,8 @@ init([_Name, ID,BodyIm,TurretIm]) ->
   random:seed(erlang:phash2([node()]),
     erlang:monotonic_time(),
     erlang:unique_integer()),
-  NewX = round(random:uniform()*500) ,
-  NewY = round(random:uniform()*500) ,
+  NewX = round(random:uniform()*(1080-90)) ,
+  NewY = round(random:uniform()*(720-90)) ,
   %gen_server:call(gui_server, {ID}),
   gen_server:call(gui_server, {new,BodyIm,TurretIm, NewX,NewY,0}),
   {ok, #state{id = ID,bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY ,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 10}}.
@@ -100,13 +100,13 @@ handle_call({fire, ID}, _From, State = #state{ id = ID, xPos = X, yPos = Y, turr
 
 handle_call({moveBody,ID ,Xspeed, Yspeed,Angle}, _From, State = #state{ id = ID,bodyDir = BodyAngle,turretDir = TurretAngle ,bodyIm = BodyIm,turretIm = TurretIm, xPos = Xcur, yPos = Ycur}) ->
   if
-    (((Xspeed + Xcur) >= 0) and ((Xspeed + Xcur) =< 1000)) ->
+    (((Xspeed + Xcur) >= 0) and ((Xspeed + Xcur) =< 1080-90)) ->
       NewX = Xcur + Xspeed;
     true ->
       NewX = Xcur
   end,
   if
-    (((Yspeed + Ycur) >= 0) and ((Yspeed + Ycur) =< 700)) ->
+    (((Yspeed + Ycur) >= 0) and ((Yspeed + Ycur) =< 720-90)) ->
       NewY = Ycur + Yspeed;
     true ->
       NewY = Ycur
@@ -128,9 +128,10 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
 
 handle_call({hit,ShellX,ShellY}, {From,_Tag}, State = #state{ xPos = X, yPos = Y, hitPoints = HP}) ->
   if
-    ((abs(ShellX - (X+45)) < 50) and (abs(ShellY-(Y+45))<50)) ->
+    ((abs((ShellX) - (X+5)) < 30) and (abs((ShellY)-(Y+5))<30)) ->
       HPn = HP - 10,
       gen_server:call(gui_server, {explosion, X, Y}),
+      timer:apply_after(500,gen_server,call,[gui_server,{background,X,Y,90+30,90+25}]),
       supervisor:terminate_child(shell_sup,From);
     true -> HPn = HP
   end,

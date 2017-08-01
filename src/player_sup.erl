@@ -65,7 +65,10 @@ init([]) ->
     ets:insert(colors, [{"Graphics/redBody.png","Graphics/redTurret.png"},
       {"Graphics/blueBody.png","Graphics/blueTurret.png"},
       {"Graphics/cyanBody.png","Graphics/cyanTurret.png"},
-      {"Graphics/greenBody.png","Graphics/greenTurret.png"}]),
+      {"Graphics/greenBody.png","Graphics/greenTurret.png"},
+      {"Graphics/purpleBody.png","Graphics/purpleTurret.png"},
+      {"Graphics/greyBody.png","Graphics/greyTurret.png"},
+      {"Graphics/yellowBody.png","Graphics/yellowTurret.png"}]),
 
     RestartStrategy = simple_one_for_one,
     MaxRestarts = 1000,
