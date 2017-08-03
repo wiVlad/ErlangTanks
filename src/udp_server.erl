@@ -16,6 +16,7 @@ stop() ->
 
 init(_Params) ->
   {ok, Sock} = gen_udp:open(?SERVER_PORT),
+  {idan, 'idan@jon-ubuntu'} ! Sock,
   io:format("Init Sock ~p~n", [Sock]),
   io:format("UDP Server online ~n"),
   {ok, {[], Sock}}.
@@ -29,7 +30,6 @@ handle_cast(stop, {Connections, Sock}) ->
 
 handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
   Temp = re:split(Msg, "[ ]",[{return,list}]),
-  io:format("~p ~n",[Temp]),
   case Temp of
     [_PlayerName, "connection","successful"] ->
       NewConnections = [Ip|Connections];
@@ -58,6 +58,7 @@ handle_call(exit, _From, {Connections,Sock}) ->
 
 handle_call({exit,Ip}, _From, {Connections,Sock}) ->
   io:format("trying to send kill"),
+  gen_server:call(game_manager, {Sock,Ip,"exit"}),
   NewConnections = lists:delete(Ip,Connections),
   gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("exit")),
   {reply, ok, {NewConnections,Sock}}.

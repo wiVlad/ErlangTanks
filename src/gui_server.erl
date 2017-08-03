@@ -73,11 +73,11 @@ start_link() ->
 init([]) ->
   io:format("GUI Server online ~n"),
   Wx = wx:new(),
-  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1366,720}}]),
+  Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1320,720}}]),
   MenuBar = wxMenuBar:new(),
   wxFrame:setMenuBar(Frame, MenuBar),
   Panel = wxPanel:new(Frame, [{pos, {0,0}},{size,{1080,720}},{style, ?wxBORDER_DOUBLE}]),
-  Panel2 = wxPanel:new(Frame, [{pos, {1080,0}},{size,{286,720}},{style, ?wxBORDER_DOUBLE}]),
+  Panel2 = wxPanel:new(Frame, [{pos, {1080,0}},{size,{240,720}},{style, ?wxBORDER_DOUBLE}]),
 
   %% Setup sizers
   MainSizer = wxBoxSizer:new(?wxVERTICAL),
@@ -90,14 +90,20 @@ init([]) ->
 
   %% Create static texts
   Texts = [wxStaticText:new(Panel2, 1, "Erlang Tanks Game", []),
-    wxStaticText:new(Panel2, 2, "Jonathan and Vlad",
+    wxStaticText:new(Panel2, 3, "Jonathan and Vlad",
       [{style, ?wxALIGN_CENTER bor ?wxST_NO_AUTORESIZE}])],
+
+  Image = wxImage:new("Graphics/erlang2.png", []),
+  Bitmap = wxBitmap:new(wxImage:scale(Image,
+    round(wxImage:getWidth(Image)*0.19),
+    round(wxImage:getHeight(Image)*0.25),
+    [{quality, ?wxIMAGE_QUALITY_HIGH}])),
+  StaticBitmap = wxStaticBitmap:new(Panel2, 1, Bitmap),
 
 
   B_Start = wxButton:new(Panel2, 1, [{label,"Start"}]),
   B_Quit = wxButton:new(Panel2, 2, [{label,"Quit"}]),
   wxWindow:connect(Panel2, command_button_clicked),
-
 
   Font = wxFont:new(10, ?wxFONTFAMILY_SWISS,
     ?wxFONTSTYLE_NORMAL,
@@ -110,9 +116,11 @@ init([]) ->
   wxGrid:setRowLabelSize(Grid, 55),
   wxGrid:setLabelFont(Grid, Font),
   wxGrid:fit(Grid),
+
   %% Add to sizers
   [wxSizer:add(TextSizer, Text, [{flag, ?wxEXPAND bor ?wxALL},
     {border, 5}]) || Text <- Texts],
+  wxSizer:add(TextSizer, StaticBitmap, []),
   wxSizer:add(ButtonSizer, B_Start, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxEXPAND},
     {border, 5}]),
   wxSizer:add(ButtonSizer, B_Quit, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxEXPAND},
@@ -121,30 +129,17 @@ init([]) ->
     {border, 5},{proportion, 1}]),
 
   Options = [{flag, ?wxEXPAND}, {proportion, 1}],
-
-
   wxSizer:add(MainSizer, TextSizer, Options),
-  wxSizer:add(MainSizer, ButtonSizer, []),
-  wxSizer:add(MainSizer, GridSizer, [{border, 4}, {flag, ?wxALL}, {proportion, 1}]),
-
+  wxSizer:add(MainSizer, ButtonSizer, [{border, 5}, {flag, ?wxALL}]),
+  wxSizer:add(MainSizer, GridSizer, [{border, 5}, {flag, ?wxALL}, {proportion, 1}]),
   wxPanel:setSizer(Panel2, MainSizer),
-
 
   wxFrame:connect(Panel, paint),
   wxFrame:show(Frame),
-  %Box = wxStaticBox:new(Panel2, 2,"Game Status",[{pos,{50,0}}]),
-  %Grid = wxGrid:new(Panel2,0,25,[{w,195},{h,695}]),
-  %wxGrid:setRowSize(Grid,8,10),
-  %wxGrid:setColSize(Grid,2,30),
-  %wxStaticBox:setBackgroundColour(Box,?wxBLUE),
-  %Ts = wxBoxSizer:new(?wxHORIZONTAL),
-  %wxSizer:add(Ts,20,20,[]),
-  %Button = wxButton:new(Panel2,-1,"button"),
-  %wxPanel:setSizer(Panel2,Ts),
   wxPanel:setBackgroundColour(Panel,?wxBLACK),
   wxPanel:setBackgroundColour(Panel2,?wxLIGHT_GREY),
-  wxFrame:setMaxSize(Frame,{1366,720}),
-  wxFrame:setMinSize(Frame,{1366,720}),
+  wxFrame:setMaxSize(Frame,{1320,720}),
+  wxFrame:setMinSize(Frame,{1320,720}),
   {ok, {Panel,Grid}}.
 
 
@@ -223,6 +218,9 @@ handle_cast(Request, {Panel,Grid}) ->
     {crate, X, Y, ammo} ->
       CratePic = wxImage:new("Graphics/crateAmmo.png"),
       draw_crate(Panel, X, Y, CratePic);
+    {winner, PlayerName} ->
+      D = wxMessageDialog:new(Panel,"The Winner is "++PlayerName++"!"),
+      wxMessageDialog:showModal(D);
     {shell, X, Y, NewX,NewY,Dir} ->
       EraseShell = wxImage:new("Graphics/eraseShell.png"),
       ShellPic = wxImage:new("Graphics/Shell.png"),

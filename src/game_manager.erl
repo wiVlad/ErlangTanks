@@ -85,23 +85,36 @@ handle_call({_Sock,Ip,Request}, _From, State = #state{gameInProgress = true, num
 
   case Msg of
     [_PlayerName, "connection","successful"] ->
-      ok;
+      NewNum = Num,
+      NewStatus = true;
     ["FIRE"] ->
+      io:format("Num of players ~p ~n",[Num]),
+      NewNum = Num,
+      NewStatus = true,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {fire, Ip});
     ["exit"] ->
+      NewStatus = true,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
+      NewNum = Num -1,
       supervisor:terminate_child(player_sup,Pid);
     ["Turret", Angle] ->
+      NewNum = Num,
+      NewStatus = true,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
     ["Body", X, Y, Angle] ->
+      NewNum = Num,
       [{Ip, Pid}] = ets:lookup(ids, Ip),
-      gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)})
+      gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)}),
+      if
+        (NewNum == 1) ->  NewStatus = false,
+          gen_server:cast(Pid, {winner});
+        true -> NewStatus = true
+      end
 
   end,
-
-  {reply, ok, State};
+  {reply, ok, State#state{gameInProgress = NewStatus,numOfPlayers =  NewNum}};
 
 handle_call({Sock,Ip,Request}, _From, State = #state{gameInProgress = false, numOfPlayers =  Num}) ->
   Msg = re:split(Request, "[ ]",[{return,list}]),

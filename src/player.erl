@@ -25,7 +25,7 @@
 
 -define(SERVER, ?MODULE).
 -include("include/ErlangTanks.hrl").
--record(state, {id,num, bodyIm,turretIm,xPos,yPos,score = 0,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 50}).
+-record(state, {id,name, num, bodyIm,turretIm,xPos,yPos,score = 0,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 50}).
 
 %%%===================================================================
 %%% API
@@ -70,7 +70,7 @@ init([Name,Num, ID,BodyIm,TurretIm]) ->
   gen_server:call(gui_server, {grid, Num, 50, 50}),
   gen_server:call(gui_server, {grid, Num, 0}),
   gen_server:call(gui_server, {new,Name,BodyIm,TurretIm, NewX,NewY,0}),
-  {ok, #state{id = ID,num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY}}.
+  {ok, #state{id = ID,name = Name, num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -129,6 +129,7 @@ handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyI
   {reply, ok, State#state{turretDir = EffAngle}}.
 
 
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -181,6 +182,10 @@ handle_cast({score}, State = #state{ score = Score, num = Num, xPos = X, yPos = 
 
   gen_server:call(gui_server, {grid,Num, Score+1}),
   {noreply, State#state{ score = Score + 1 }};
+
+handle_cast({winner}, State = #state{ name = Name }) ->
+  gen_server:cast(gui_server, {winner,Name}),
+  {noreply, State};
 
 handle_cast(_Request, State) ->
   {noreply, State}.
