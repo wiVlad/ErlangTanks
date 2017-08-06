@@ -21,8 +21,8 @@
   handle_info/2,
   terminate/2,
   code_change/3]).
--include("Include/ErlangTanks.hrl").
--include("Include/data.hrl").
+-include("ErlangTanks.hrl").
+-include("data.hrl").
 -define(SERVER, game_manager).
 -record(state, { numOfPlayers = 0, gameInProgress = false }).
 
@@ -63,7 +63,7 @@ start_link(GameState,GuiState,PlayerList,CrateList) ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   erlang:send_after(2000, self(), backup),
-  ets:new(ids, [set, named_table, public]),
+  %ets:new(ids, [set, named_table, public]),
   process_flag(trap_exit, true),
   io:format("Game Manager Online ~n"),
   F = fun() ->
@@ -72,7 +72,7 @@ init([]) ->
   {ok, #state{gameInProgress = false, numOfPlayers =  0}};
 init([GameState,GuiState,PlayerList,CrateList]) ->
   erlang:send_after(2000, self(), backup),
-  ets:new(ids, [set, named_table, public]),
+  %ets:new(ids, [set, named_table, public]),
   process_flag(trap_exit, true),
   io:format("Game Manager recovered ~n"),
   [{game_state,_Pid, GameStatus, NumOfPlayers}] = GameState,

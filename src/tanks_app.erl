@@ -11,8 +11,8 @@
 
 -behaviour(application).
 
--include("Include/ErlangTanks.hrl").
--include("Include/data.hrl").
+-include("ErlangTanks.hrl").
+-include("data.hrl").
 %% Application callbacks
 -export([start/2,
   stop/1,start_phase/3,delete_mnes/0,traverse_table_and_show/1]).
@@ -64,6 +64,8 @@ start(normal, _StartArgs) ->
   mnesia:create_table(udp_state,
     [{attributes, record_info(fields, udp_state)},{disc_copies, NodeList}]),
   %mnesia:wait_for_tables([game_manager_tab], 5000),
+  ets:new(ids, [set, named_table, public]),
+  ets:new(colors, [set, named_table,public]),
   case game_sup:start_link(normal) of
     {ok, Pid} ->
       {ok, Pid};
@@ -72,6 +74,8 @@ start(normal, _StartArgs) ->
   end;
 start({failover,_Node}, _StartArgs) ->
   io:format("not normal start: ~p~n", [failover]),
+  ets:new(ids, [set, named_table, public]),
+  ets:new(colors, [set, named_table,public]),
   io:format("~n~p",[mnesia:info()]),
   [{udp_state, Sock, _Connections}] = ets:tab2list(udp_state),
   mnesia:transaction(fun() -> mnesia:delete({udp_state, Sock}) end),
@@ -90,6 +94,8 @@ start({failover,_Node}, _StartArgs) ->
   end;
 start({takeover,_Node}, _StartArgs) ->
   io:format("not normal start: ~p~n", [takeover]),
+  ets:new(ids, [set, named_table, public]),
+  ets:new(colors, [set, named_table,public]),
   mnesia:start(),
   io:format("~n~p",[mnesia:info()]),
   io:format("~n~p",[rpc:call(?BackupNode, ets, tab2list, [udp_state])]),
@@ -115,6 +121,8 @@ start({takeover,_Node}, _StartArgs) ->
 
 stop(_State) ->
   io:format("~nstopping~n"),
+  ets:delete(colors),
+  ets:delete(ids),
   delete_mnes(),
 ok.
 %%%===================================================================

@@ -4,8 +4,8 @@
 -export([send/1]).
 
 -behaviour(gen_server).
--include("Include/ErlangTanks.hrl").
--include("Include/data.hrl").
+-include("ErlangTanks.hrl").
+-include("data.hrl").
 -define(SERVER_PORT, 4000).
 -define(CLIENT_PORT, 18001).
 
@@ -27,15 +27,15 @@ init(_Params) ->
 
 terminate(_Reason, {Connections, Sock}) ->
   io:format("UDP Server terminated~n"),
+  io:format("print this shit: ~p ~n",[ets:tab2list(ids)]),
   lists:foreach(fun(A) ->
     gen_udp:send(Sock, A, ?SERVER_PORT, list_to_binary("exit"))
                 end, Connections),
-  lists:foreach(fun([{Ip, _Pid}]) ->
-    io:format("print this shit: ~p ~n",[Ip]),
+  lists:foreach(fun({Ip, _Pid}) ->
+
     gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("exit"))
                 end, ets:tab2list(ids)),
-  ets:delete(colors),
-  ets:delete(ids),
+
   gen_udp:close(Sock).
 
 handle_cast({exit,Ip}, {Connections,Sock}) ->

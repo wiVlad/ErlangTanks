@@ -13,7 +13,8 @@
 
 %% API
 -export([start_link/1]).
-
+  -include("ErlangTanks.hrl").
+  -include("data.hrl").
 %% Supervisor callbacks
 -export([init/1]).
 

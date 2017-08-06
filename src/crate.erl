@@ -24,8 +24,8 @@
 
 -define(SERVER, ?MODULE).
 
--include("Include/ErlangTanks.hrl").
--include("Include/data.hrl").
+-include("ErlangTanks.hrl").
+-include("data.hrl").
 
 
 %%%===================================================================

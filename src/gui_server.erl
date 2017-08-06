@@ -24,8 +24,8 @@
 
 -define(SERVER, ?MODULE).
 -include_lib("wx/include/wx.hrl").
--include("Include/ErlangTanks.hrl").
--include("Include/data.hrl").
+-include("ErlangTanks.hrl").
+-include("data.hrl").
 -record(state, {}).
 %%%===================================================================
 %%% API
@@ -66,7 +66,7 @@ init([]) ->
   io:format("GUI Server online ~n"),
   process_flag(trap_exit, true),
 
-  ets:new(colors, [set, named_table,public]),
+  %ets:new(colors, [set, named_table,public]),
 
   Wx = wx:new(),
   Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1320,720}}]),
