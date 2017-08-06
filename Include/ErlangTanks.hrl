@@ -1,0 +1,12 @@
+
+-define(max_x,(1080)).
+-define(max_y,(720)).
+-define(SHELL_INTERVAL, 20).
+-define(CRATE_RANGE_INTERVAL, 7000).
+-define(CRATE_MIN_INTERVAL, 7000).
+-define(CRATE_INTERVAL, 100).
+-define(TANK_INTERVAL, 500).
+-define(GAME_LENGTH, 120). %in seconds
+-define(inRange(Xself,Xother,Yself,Yother), ((abs((Xother) - (Xself+5)) < 30) and (abs((Yother)-(Yself+5))<30))).
+-define(MainNode, 'jon@jon-ubuntu').
+-define(BackupNode, 'vlad@jon-ubuntu').
