@@ -80,7 +80,8 @@ init([GameState,GuiState,PlayerList,CrateList]) ->
   lists:foreach(fun(E)->
     {player_state,ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, HitPoints}=E,
     {ok, PlayerPid} = supervisor:start_child(player_sup, [ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, HitPoints]),
-    ets:insert(ids,{ID,PlayerPid})
+    ets:insert(ids,{ID,PlayerPid}),
+    gen_server:cast(udp_server, {new_ip, ID})
                 end,PlayerList),
   lists:foreach(fun(E)->
     {crate_state,PID,X,Y,Type,Quantity}=E,
@@ -170,14 +171,17 @@ handle_call(_Request, _From, State) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_cast({kill_player,Ip}, State = #state{numOfPlayers = Num} ) ->
-  [{Ip, Pid}] = ets:lookup(ids, Ip),
-  ets:delete(ids,Ip),
-  gen_server:call(Pid, exit),  %to erase tank from gui
-  F = fun() ->
-    mnesia:delete({player_state, Ip}) end,
-  mnesia:transaction(F),
-  NewNum = Num -1,
-  supervisor:terminate_child(player_sup,Pid),
+  case ets:lookup(ids,Ip) of
+  [{Ip, Pid}] ->
+      ets:delete(ids,Ip),
+      gen_server:call(Pid, exit),  %to erase tank from gui
+      F = fun() ->
+        mnesia:delete({player_state, Ip}) end,
+      mnesia:transaction(F),
+      NewNum = Num -1,
+      supervisor:terminate_child(player_sup,Pid);
+    [] -> NewNum = Num
+  end,
   {noreply, State#state{numOfPlayers = NewNum}};
 handle_cast({kill_shell,Pid}, State ) ->
   supervisor:terminate_child(shell_sup,Pid),

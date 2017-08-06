@@ -27,7 +27,6 @@ init(_Params) ->
 
 terminate(_Reason, {Connections, Sock}) ->
   io:format("UDP Server terminated~n"),
-  io:format("print this shit: ~p ~n",[ets:tab2list(ids)]),
   lists:foreach(fun(A) ->
     gen_udp:send(Sock, A, ?SERVER_PORT, list_to_binary("exit"))
                 end, Connections),
@@ -41,7 +40,12 @@ terminate(_Reason, {Connections, Sock}) ->
 handle_cast({exit,Ip}, {Connections,Sock}) ->
   NewConnections = lists:delete(Ip,Connections),
   gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("exit")),
-  {noreply, {NewConnections,Sock}}.
+  {noreply, {NewConnections,Sock}};
+handle_cast({new_ip,Ip}, {Connections,Sock}) ->
+  {A,B,C,D} = (local_ip_v4()),
+  Address = integer_to_list(A)++"."++integer_to_list(B)++"."++integer_to_list(C)++"."++integer_to_list(D),
+  gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary(Address)),
+  {noreply, {Connections,Sock}}.
 
 handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
   Temp = re:split(Msg, "[ ]",[{return,list}]),
@@ -80,3 +84,9 @@ handle_call(exit, _From, {Connections,Sock}) ->
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
+
+local_ip_v4() ->
+  {ok, Addrs} = inet:getifaddrs(),
+  hd([Addr || {_, Opts} <- Addrs,
+    {addr, Addr} <- Opts,
+    size(Addr) == 4, Addr =/= {127,0,0,1}]).
