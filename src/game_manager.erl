@@ -21,8 +21,8 @@
   handle_info/2,
   terminate/2,
   code_change/3]).
--include("ErlangTanks.hrl").
--include("data.hrl").
+-include("Include/ErlangTanks.hrl").
+-include("Include/data.hrl").
 -define(SERVER, game_manager).
 -record(state, { numOfPlayers = 0, gameInProgress = false }).
 

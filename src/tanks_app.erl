@@ -11,8 +11,8 @@
 
 -behaviour(application).
 
--include("ErlangTanks.hrl").
--include("data.hrl").
+-include("Include/ErlangTanks.hrl").
+-include("Include/data.hrl").
 %% Application callbacks
 -export([start/2,
   stop/1,start_phase/3,delete_mnes/0,traverse_table_and_show/1]).

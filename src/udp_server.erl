@@ -4,7 +4,8 @@
 -export([send/1]).
 
 -behaviour(gen_server).
--include("data.hrl").
+-include("Include/ErlangTanks.hrl").
+-include("Include/data.hrl").
 -define(SERVER_PORT, 4000).
 -define(CLIENT_PORT, 18001).
 

@@ -23,7 +23,8 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--include("ErlangTanks.hrl").
+-include("Include/ErlangTanks.hrl").
+-include("Include/data.hrl").
 -record(state, {x,y,xinc,yinc,dir,playerPid}).
 
 %%%===================================================================

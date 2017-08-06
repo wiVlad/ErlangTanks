@@ -24,8 +24,8 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--include("ErlangTanks.hrl").
--include("data.hrl").
+-include("Include/ErlangTanks.hrl").
+-include("Include/data.hrl").
 -record(state, {id,name, num, bodyIm,turretIm,xPos,yPos,score,bodyDir, turretDir, ammo, hitPoints}).
 
 %%%===================================================================

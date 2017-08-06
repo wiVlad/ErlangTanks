@@ -20,7 +20,8 @@
 
 %% Supervisor callbacks
 -export([init/1]).
--include("ErlangTanks.hrl").
+-include("Include/ErlangTanks.hrl").
+-include("Include/data.hrl").
 -define(SERVER, ?MODULE).
 
 %%%===================================================================

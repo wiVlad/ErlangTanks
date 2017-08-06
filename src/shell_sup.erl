@@ -10,7 +10,8 @@
 -author("vlad").
 
 -behaviour(supervisor).
-
+-include("Include/ErlangTanks.hrl").
+-include("Include/data.hrl").
 %% API
 -export([
   start_link/0,
