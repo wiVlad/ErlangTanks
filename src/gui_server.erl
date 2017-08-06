@@ -299,11 +299,18 @@ handle_info({wx,1,A,_B,_C}, State) ->
   gen_server:cast(game_manager,startGame),
   {noreply, State};
 
+
 handle_info({wx,2,_A,_B,_C}, State) ->
   io:format("QUIT! node: ~p~n",[node()]),
   spawn(node(),application,stop,[tanks_app]),
   %tanks_app:stop(0),
   {noreply, State};
+handle_info(backup, {Panel,Grid,TimeView,Timer}) ->
+  F = fun() ->
+    mnesia:write(#gui_state{panel=Panel,grid=Grid,time=TimeView,timer=Timer}) end,
+  mnesia:transaction(F),
+  timer:send_after(10000, backup),
+  {noreply, {Panel,Grid,TimeView,Timer}};
 handle_info({newTime,0}, {Panel,Grid,TimeView,Timer}) ->
   wxStaticText:setLabel(TimeView,"0:00"),
   gen_server:cast(game_manager,endGame),
@@ -323,7 +330,7 @@ handle_info({newTime,Timer}, {Panel,Grid,TimeView,_Timer}) ->
   F = fun() ->
     mnesia:write(#gui_state{panel=Panel,grid=Grid,time=TimeView,timer=Timer-1}) end,
   mnesia:transaction(F),
-
+  timer:send_after(10000, backup),
   {noreply, {Panel,Grid,TimeView,Timer-1}};
 
 

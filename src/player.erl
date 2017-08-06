@@ -65,7 +65,7 @@ start_link(ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Amm
   {stop, Reason :: term()} | ignore).
 init([Name,Num, ID,BodyIm,TurretIm]) ->
   io:format("New Player, ID: ~p ~n", [ID]),
-  erlang:send_after(2000, self(), backup),
+  erlang:send_after(10000, self(), backup),
   erlang:send_after(?TANK_INTERVAL, self(), trigger),
   random:seed(erlang:phash2([node()]),
     erlang:monotonic_time(),
@@ -84,7 +84,7 @@ init([Name,Num, ID,BodyIm,TurretIm]) ->
   {ok, #state{id = ID,name = Name, num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY,score = 0,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 50}};
 init([ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, HitPoints]) ->
   io:format("Player recovered, ID: ~p ~n", [ID]),
-  erlang:send_after(2000, self(), backup),
+  erlang:send_after(10000, self(), backup),
   erlang:send_after(?TANK_INTERVAL, self(), trigger),
   gen_server:cast(gui_server, {grid, Name, Num, Ammo, HitPoints}),
   gen_server:cast(gui_server, {grid, Num, Ammo, HitPoints}),
@@ -285,7 +285,7 @@ handle_info(backup, State = #state{id = ID,name = Name, num = Num, bodyIm = Body
       xPos = X ,yPos = Y,score = Score,bodyDir = BodyDir, turretDir = TurretDir, ammo = Ammo, hitPoints=Hp})
       end,
   mnesia:transaction(F),
-  erlang:send_after(2000, self(), backup),
+  erlang:send_after(10000, self(), backup),
   {noreply, State};
 handle_info(trigger, State = #state{ bodyDir = BodyAngle,turretDir = TurretAngle ,bodyIm = BodyIm,turretIm = TurretIm, xPos = X, yPos = Y}) ->
   gen_server:cast(gui_server, {body,BodyIm,TurretIm, X, Y, X,Y,BodyAngle, TurretAngle}),

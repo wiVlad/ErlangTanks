@@ -62,7 +62,7 @@ start_link(GameState,GuiState,PlayerList,CrateList) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  erlang:send_after(2000, self(), backup),
+  erlang:send_after(10000, self(), backup),
   %ets:new(ids, [set, named_table, public]),
   process_flag(trap_exit, true),
   io:format("Game Manager Online ~n"),
@@ -71,7 +71,7 @@ init([]) ->
   mnesia:transaction(F),
   {ok, #state{gameInProgress = false, numOfPlayers =  0}};
 init([GameState,GuiState,PlayerList,CrateList]) ->
-  erlang:send_after(2000, self(), backup),
+  erlang:send_after(10000, self(), backup),
   %ets:new(ids, [set, named_table, public]),
   process_flag(trap_exit, true),
   io:format("Game Manager recovered ~n"),
@@ -268,7 +268,7 @@ handle_info(backup, State = #state{gameInProgress = Status,numOfPlayers = Num}) 
   F = fun() ->
     mnesia:write(#game_state{pid = self(), gameInProgress = Status,numOfPlayers = Num}) end,
   mnesia:transaction(F),
-  erlang:send_after(2000, self(), backup),
+  erlang:send_after(10000, self(), backup),
   {noreply, State};
 handle_info(_Info, State) ->
   {noreply, State}.
