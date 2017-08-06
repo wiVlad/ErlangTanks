@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0,start_link/5]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -24,8 +24,9 @@
 
 -define(SERVER, ?MODULE).
 
--include("include/ErlangTanks.hrl").
--record(state, {}).
+-include("ErlangTanks.hrl").
+-include("data.hrl").
+
 
 %%%===================================================================
 %%% API
@@ -42,6 +43,8 @@
 start_link() ->
   gen_server:start_link(?MODULE, [0], []).
 
+start_link(PID,X,Y,Type,Quantity) ->
+  gen_server:start_link(?MODULE, [PID,X,Y,Type,Quantity], []).
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -58,9 +61,9 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(init(Args :: term()) ->
-  {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
+  {ok, State :: #crate_state{}} | {ok, State :: #crate_state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
-init(_Args) ->
+init([0]) ->
   random:seed(erlang:phash2([node()]), erlang:monotonic_time(), erlang:unique_integer()),
   TypesList =[health,ammo],
   Type = lists:nth(random:uniform(length(TypesList)),TypesList),
@@ -71,7 +74,16 @@ init(_Args) ->
         Quantity = random:uniform(10)
   end,
   erlang:send_after(?CRATE_INTERVAL, self(), trigger),
-  {ok, { random:uniform(?max_x - 45) , random:uniform(?max_y - 45), Type, Quantity}}.
+  X = random:uniform(?max_x - 45) , Y = random:uniform(?max_y - 45),
+  F = fun() ->
+    mnesia:write(#crate_state{pid = self(), x=X,y=Y,type=Type,quantity = Quantity})
+      end,
+  mnesia:transaction(F),
+  {ok, #crate_state{pid = self(), x = X , y = Y, type = Type, quantity = Quantity}};
+init([_Pid,X,Y,Type,Quantity]) ->
+  gen_server:cast(gui_server, {crate, X,Y, Type}),
+  erlang:send_after(?CRATE_INTERVAL, self(), trigger),
+  {ok, #crate_state{pid = self(), x = X , y = Y, type = Type, quantity = Quantity}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -81,13 +93,13 @@ init(_Args) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(handle_call(Request :: term(), From :: {pid(), Tag :: term()},
-    State :: #state{}) ->
-  {reply, Reply :: term(), NewState :: #state{}} |
-  {reply, Reply :: term(), NewState :: #state{}, timeout() | hibernate} |
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
-  {stop, Reason :: term(), NewState :: #state{}}).
+    State :: #crate_state{}) ->
+  {reply, Reply :: term(), NewState :: #crate_state{}} |
+  {reply, Reply :: term(), NewState :: #crate_state{}, timeout() | hibernate} |
+  {noreply, NewState :: #crate_state{}} |
+  {noreply, NewState :: #crate_state{}, timeout() | hibernate} |
+  {stop, Reason :: term(), Reply :: term(), NewState :: #crate_state{}} |
+  {stop, Reason :: term(), NewState :: #crate_state{}}).
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
@@ -98,10 +110,10 @@ handle_call(_Request, _From, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_cast(Request :: term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
+-spec(handle_cast(Request :: term(), State :: #crate_state{}) ->
+  {noreply, NewState :: #crate_state{}} |
+  {noreply, NewState :: #crate_state{}, timeout() | hibernate} |
+  {stop, Reason :: term(), NewState :: #crate_state{}}).
 handle_cast(_Request, State) ->
   {noreply, State}.
 
@@ -115,17 +127,16 @@ handle_cast(_Request, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
--spec(handle_info(Info :: timeout() | term(), State :: #state{}) ->
-  {noreply, NewState :: #state{}} |
-  {noreply, NewState :: #state{}, timeout() | hibernate} |
-  {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(trigger, {X,Y,Type,Quantity}) ->
+-spec(handle_info(Info :: timeout() | term(), State :: #crate_state{}) ->
+  {noreply, NewState :: #crate_state{}} |
+  {noreply, NewState :: #crate_state{}, timeout() | hibernate} |
+  {stop, Reason :: term(), NewState :: #crate_state{}}).
+handle_info(trigger, State = #crate_state{x=X,y=Y,type=Type,quantity=Quantity}) ->
   gen_server:cast(gui_server, {crate, X,Y, Type}),
   SendTo = ets:tab2list(ids),
   lists:foreach(fun({_Ip,Pid}) -> gen_server:cast(Pid, {crate,X,Y, Type, Quantity, self()}) end, SendTo),
   erlang:send_after(?CRATE_INTERVAL, self(), trigger),
-  {noreply, {X,Y,Type,Quantity}}.
-
+  {noreply, State}.
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -138,7 +149,7 @@ handle_info(trigger, {X,Y,Type,Quantity}) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
-    State :: #state{}) -> term()).
+    State :: #crate_state{}) -> term()).
 terminate(_Reason, _State) ->
   ok.
 
@@ -150,9 +161,9 @@ terminate(_Reason, _State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
--spec(code_change(OldVsn :: term() | {down, term()}, State :: #state{},
+-spec(code_change(OldVsn :: term() | {down, term()}, State :: #crate_state{},
     Extra :: term()) ->
-  {ok, NewState :: #state{}} | {error, Reason :: term()}).
+  {ok, NewState :: #crate_state{}} | {error, Reason :: term()}).
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 

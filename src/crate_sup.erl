@@ -14,12 +14,13 @@
 %% API
 -export([
   start_link/0,
-  start_new_crate/0
+  start_new_crate/0,
+  start_link/1
 ]).
 
 %% Supervisor callbacks
 -export([init/1]).
--include("include/ErlangTanks.hrl").
+-include("ErlangTanks.hrl").
 -define(SERVER, ?MODULE).
 
 %%%===================================================================
@@ -36,7 +37,8 @@
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
-
+start_link(CrateList) ->
+  supervisor:start_link({local, ?SERVER}, ?MODULE, [CrateList]).
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
@@ -71,11 +73,29 @@ init([]) ->
   AChild = {'?MODULE', {'crate', start_link, []},
     Restart, Shutdown, Type, ['crate']},
   io:format("Crate Supervisor online ~n"),
+  {ok, {SupFlags, [AChild]}};
+
+init([CrateList]) ->
+  RestartStrategy = simple_one_for_one,
+  MaxRestarts = 1000,
+  MaxSecondsBetweenRestarts = 3600,
+  SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
+  Restart = permanent,
+  Shutdown = 2000,
+  Type = worker,
+
+  AChild = {'?MODULE', {'crate', start_link, []},
+    Restart, Shutdown, Type, ['crate']},
+  io:format("Crate Supervisor recovered ~n"),
+  lists:foreach(fun(E)->
+    {crate_state,PID,X,Y,Type,Quantity}=E,
+    supervisor:start_child(?MODULE, [PID,X,Y,Type,Quantity])
+  end,CrateList),
   {ok, {SupFlags, [AChild]}}.
+
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 start_new_crate() ->
   supervisor:start_child(?MODULE, []).
-

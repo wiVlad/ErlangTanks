@@ -23,8 +23,8 @@
   code_change/3]).
 
 -define(SERVER, ?MODULE).
--include("include/ErlangTanks.hrl").
--record(state, {}).
+-include("ErlangTanks.hrl").
+-record(state, {x,y,xinc,yinc,dir,playerPid}).
 
 %%%===================================================================
 %%% API
@@ -60,10 +60,11 @@ start_link(X,Y,Dir,PlayerPid) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([X,Y, Dir,PlayerPid]) ->
+  %process_flag(trap_exit, true),
   X_inc =  - 10 * math:cos( 3.14+(Dir/180)*3.14),
   Y_inc = 10 * math:sin( 3.14+(Dir/180)*3.14),
   erlang:send_after(?SHELL_INTERVAL, self(), trigger),
-  {ok, {X,Y,Dir,X_inc,Y_inc,PlayerPid}}.
+  {ok, #state{x=X,y=Y,dir=Dir,xinc = X_inc,yinc = Y_inc,playerPid=PlayerPid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -80,11 +81,7 @@ init([X,Y, Dir,PlayerPid]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, _From, State) ->
-  case Request of
-    {exit} -> terminate(normal,exploded);
-    true -> ok
-  end,
+handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
 %%--------------------------------------------------------------------
@@ -115,9 +112,9 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed,PlayerPid}) ->
+handle_info(trigger, State = #state{x=X,y=Y,dir=Dir,xinc=Xspeed,yinc=Yspeed,playerPid=PlayerPid}) ->
   if
-    ((X<2000) and (X > -1000) and (Y < 1500) and (Y>-1000)) ->
+    ((X<1200) and (X > -30) and (Y < 800) and (Y>-30)) ->
       gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
       lists:foreach(fun({_Ip,Pid}) ->
         if
@@ -125,11 +122,11 @@ handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed,PlayerPid}) ->
           true -> ok
         end
        end, ets:tab2list(ids));
-    true ->  supervisor:terminate_child(shell_sup,self())
+    true ->  gen_server:cast(game_manager, {kill_shell,self()})%supervisor:terminate_child(shell_sup,self())
   end,
 
   erlang:send_after(?SHELL_INTERVAL, self(), trigger),
-  {noreply, {X+Xspeed,Y+Yspeed,Dir,Xspeed,Yspeed,PlayerPid}}.
+  {noreply, State#state{x=X+Xspeed,y=Y+Yspeed}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -145,6 +142,7 @@ handle_info(trigger, {X,Y,Dir,Xspeed,Yspeed,PlayerPid}) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
+  io:format("shell terminated~n"),
   ok.
 
 %%--------------------------------------------------------------------

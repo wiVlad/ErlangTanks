@@ -1,0 +1,1 @@
+{"src/*",[report, verbose, {i, "Include"}, {outdir, "ebin"}]}.

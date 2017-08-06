@@ -60,6 +60,8 @@ start_link() ->
   {error, Reason :: term()}).
 
 init([]) ->
+  %mnesia:create_table(shell_sup_tab, []),
+  %process_flag(trap_exit, true),
   RestartStrategy = simple_one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,

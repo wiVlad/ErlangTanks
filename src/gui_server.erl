@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0,start_link/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -24,19 +24,9 @@
 
 -define(SERVER, ?MODULE).
 -include_lib("wx/include/wx.hrl").
--define(max_x,(1000)).
--define(max_y,(700)).
-%-record(state, {}).
--record(state,
-{
-  parent,
-  config,
-  gl,
-  canvas,
-  image,
-  timer,
-  time
-}).
+-include("ErlangTanks.hrl").
+-include("data.hrl").
+-record(state, {}).
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -52,6 +42,8 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
+start_link(GuiState) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [GuiState], []).
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -72,6 +64,10 @@ start_link() ->
   {stop, Reason :: term()} | ignore).
 init([]) ->
   io:format("GUI Server online ~n"),
+  process_flag(trap_exit, true),
+
+  ets:new(colors, [set, named_table,public]),
+
   Wx = wx:new(),
   Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1320,720}}]),
   MenuBar = wxMenuBar:new(),
@@ -88,9 +84,11 @@ init([]) ->
   GridSizer = wxStaticBoxSizer:new(?wxVERTICAL, Panel2,
     [{label, "Stats"}]),
 
+  {A,B,C,D} = (local_ip_v4()),
+  Address = "Server IP: "++integer_to_list(A)++"."++integer_to_list(B)++"."++integer_to_list(C)++"."++integer_to_list(D),
   %% Create static texts
   Texts = [wxStaticText:new(Panel2, 1, "Erlang Tanks Game", []),
-    wxStaticText:new(Panel2, 3, "Jonathan and Vlad",
+    wxStaticText:new(Panel2, 3, Address,
       [{style, ?wxALIGN_CENTER bor ?wxST_NO_AUTORESIZE}])],
 
   Image = wxImage:new("Graphics/erlang2.png", []),
@@ -101,10 +99,21 @@ init([]) ->
   StaticBitmap = wxStaticBitmap:new(Panel2, 1, Bitmap),
 
 
-  B_Start = wxButton:new(Panel2, 1, [{label,"Start"}]),
-  B_Quit = wxButton:new(Panel2, 2, [{label,"Quit"}]),
-  wxWindow:connect(Panel2, command_button_clicked),
+  B_Start = wxButton:new(Panel2, 1, [{label,"Start"},{size, {80, 30}}]),
+  B_Quit = wxButton:new(Panel2, 2, [{label,"Quit"}, {size, {80, 30}}]),
+  wxWindow:connect(B_Start, command_button_clicked),
+  wxWindow:connect(B_Quit, command_button_clicked),
 
+  Seconds = (?GAME_LENGTH) rem 60,
+  Minutes = (?GAME_LENGTH) div 60,
+  if
+    (Seconds > 10) -> TimeText = integer_to_list(Minutes)++":"++integer_to_list(Seconds);
+    true ->           TimeText = integer_to_list(Minutes)++":0"++integer_to_list(Seconds)
+    end,
+  TimeView = wxStaticText:new(Panel2, 33, TimeText, [{style, ?wxALIGN_CENTER bor ?wxST_NO_AUTORESIZE}]),
+  wxStaticText:setFont(TimeView,wxFont:new(16, ?wxFONTFAMILY_SWISS,
+    ?wxFONTSTYLE_NORMAL,
+    ?wxFONTWEIGHT_NORMAL, [])),
   Font = wxFont:new(10, ?wxFONTFAMILY_SWISS,
     ?wxFONTSTYLE_NORMAL,
     ?wxFONTWEIGHT_NORMAL, []),
@@ -125,12 +134,14 @@ init([]) ->
     {border, 5}]),
   wxSizer:add(ButtonSizer, B_Quit, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxEXPAND},
     {border, 5}]),
+  wxSizer:add(ButtonSizer, TimeView, [{flag, ?wxTOP bor ?wxBOTTOM bor ?wxLEFT bor ?wxEXPAND},
+    {border, 5}]),
   wxSizer:add(GridSizer, Grid, [{flag, ?wxALL},
     {border, 5},{proportion, 1}]),
 
   Options = [{flag, ?wxEXPAND}, {proportion, 1}],
   wxSizer:add(MainSizer, TextSizer, Options),
-  wxSizer:add(MainSizer, ButtonSizer, [{border, 5}, {flag, ?wxALL}]),
+  wxSizer:add(MainSizer, ButtonSizer, [{border, 5}, {flag, ?wxALL  bor ?wxEXPAND}]),
   wxSizer:add(MainSizer, GridSizer, [{border, 5}, {flag, ?wxALL}, {proportion, 1}]),
   wxPanel:setSizer(Panel2, MainSizer),
 
@@ -140,9 +151,11 @@ init([]) ->
   wxPanel:setBackgroundColour(Panel2,?wxLIGHT_GREY),
   wxFrame:setMaxSize(Frame,{1320,720}),
   wxFrame:setMinSize(Frame,{1320,720}),
-  {ok, {Panel,Grid}}.
 
-
+  F = fun() ->
+    mnesia:write(#gui_state{panel=Panel,grid=Grid,time=TimeView,timer=?GAME_LENGTH}) end,
+  mnesia:transaction(F),
+  {ok, {Panel,Grid,TimeView,?GAME_LENGTH}}.
 
 
 %%--------------------------------------------------------------------
@@ -160,7 +173,7 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, _From, {Panel,Grid}) ->
+handle_call(Request, _From, {Panel,Grid,TimeView,Timer}) ->
   case Request of
     {new,_PlayerName,BodyIm,TurretIm,PosX,PosY,Angle} ->
       Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
@@ -184,7 +197,7 @@ handle_call(Request, _From, {Panel,Grid}) ->
       EraseShell = wxImage:new("Graphics/eraseShell.png"),
       ShellPic = wxImage:new("Graphics/Shell.png"),
       draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir);
-    {grid,Name, Num, Ammo, HP} ->
+    {grid,Name, Num, _Ammo, _HP} ->
       wxGrid:setRowLabelValue(Grid, Num, Name);
     {grid, Num, Score} ->
       wxGrid:setCellValue(Grid, Num, 2,integer_to_list(Score));
@@ -197,7 +210,10 @@ handle_call(Request, _From, {Panel,Grid}) ->
       draw_background(Panel, X-15,Y-10, SizeX,SizeY)
 
   end,
-  {reply, ok, {Panel,Grid}}.
+  {reply, ok, {Panel,Grid,TimeView,Timer}};
+handle_call(_Request, _From, State) ->
+  {reply, ok, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -210,23 +226,56 @@ handle_call(Request, _From, {Panel,Grid}) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_cast(Request, {Panel,Grid}) ->
+
+handle_cast(Request, {Panel,Grid,TimeView,Timer}) ->
   case Request of
+    {new,_PlayerName,BodyIm,TurretIm,PosX,PosY,BodyAngle,TurretAngle} ->
+      Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
+      draw_body(Panel, {PosX,PosY}, Body,BodyAngle),
+      draw_turret(Panel, {PosX,PosY},Turret,TurretAngle);
+
+    {body,BodyIm,TurretIm,OldX,OldY,NewX,NewY,EffAngle,OldTurretAngle} ->
+      Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
+      draw_background(Panel, OldX-15,OldY-10, wxImage:getWidth(Body)+30,wxImage:getHeight(Body)+25),
+      draw_body(Panel, {NewX,NewY}, Body,EffAngle),
+      draw_turret(Panel, {NewX,NewY},Turret,OldTurretAngle);
+    % State = {Panel, maps:update(Player,{{Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{EffAngle,OldTurretAngle}}, Tanks)};
+
+    {turret,BodyIm,TurretIm,PosX,PosY, EffAngle, OldBodyAngle}  ->
+      Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
+      draw_background(Panel, PosX,PosY-5, wxImage:getWidth(Body),wxImage:getHeight(Body)+10),
+      draw_body(Panel, {PosX,PosY}, Body,OldBodyAngle),
+      draw_turret(Panel, {PosX,PosY},Turret,EffAngle);
+    % State = {Panel, maps:update(Player,{{Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{OldBodyAngle,EffAngle}}, Tanks)};
+    {shell, X, Y, NewX,NewY,Dir} ->
+      EraseShell = wxImage:new("Graphics/eraseShell.png"),
+      ShellPic = wxImage:new("Graphics/Shell.png"),
+      draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir);
+    {grid,Name, Num, _Ammo, _HP} ->
+      wxGrid:setRowLabelValue(Grid, Num, Name);
+    {grid, Num, Score} ->
+      wxGrid:setCellValue(Grid, Num, 2,integer_to_list(Score));
+    {grid, Num, Ammo, HP} ->
+      wxGrid:setCellValue(Grid, Num, 1,integer_to_list(HP)),
+      wxGrid:setCellValue(Grid, Num, 0,integer_to_list(Ammo) );
+    {explosion, X, Y} ->
+      draw_explosion(Panel, X, Y);
+    {background, X, Y,SizeX,SizeY} ->
+      draw_background(Panel, X-15,Y-10, SizeX,SizeY);
     {crate, X, Y, health} ->
       CratePic = wxImage:new("Graphics/crateHealth.png"),
       draw_crate(Panel, X, Y, CratePic);
     {crate, X, Y, ammo} ->
       CratePic = wxImage:new("Graphics/crateAmmo.png"),
       draw_crate(Panel, X, Y, CratePic);
+    {erase, {Num,X,Y}} ->
+      wxGrid:deleteRows(Grid, [{pos, Num},{numRows, 1}]),
+      draw_background(Panel, X-15,Y-10, 90+30,90+25);
     {winner, PlayerName} ->
       D = wxMessageDialog:new(Panel,"The Winner is "++PlayerName++"!"),
-      wxMessageDialog:showModal(D);
-    {shell, X, Y, NewX,NewY,Dir} ->
-      EraseShell = wxImage:new("Graphics/eraseShell.png"),
-      ShellPic = wxImage:new("Graphics/Shell.png"),
-      draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir)
+      wxMessageDialog:showModal(D)
   end,
-  {noreply, {Panel,Grid}}.
+  {noreply, {Panel,Grid,TimeView,Timer}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -243,18 +292,42 @@ handle_cast(Request, {Panel,Grid}) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
-handle_info({wx,1,_A,_B,_C}, State) ->
-  io:format("STRAT!~n"),
+handle_info({wx,1,A,_B,_C}, State) ->
+  wxButton:disable(A),
+  io:format("START!~n"),
+  timer:send_after(1000, {newTime,?GAME_LENGTH}),
   gen_server:cast(game_manager,startGame),
   {noreply, State};
 
 handle_info({wx,2,_A,_B,_C}, State) ->
-  io:format("QUIT!"),
-  tanks_app:stop(0),
+  io:format("QUIT! node: ~p~n",[node()]),
+  spawn(node(),application,stop,[tanks_app]),
+  %tanks_app:stop(0),
   {noreply, State};
+handle_info({newTime,0}, {Panel,Grid,TimeView,Timer}) ->
+  wxStaticText:setLabel(TimeView,"0:00"),
+  gen_server:cast(game_manager,endGame),
+  D = wxMessageDialog:new(Panel,"Time's up!"),
+  wxMessageDialog:showModal(D),
+  {noreply, {Panel,Grid,TimeView,Timer}};
+handle_info({newTime,Timer}, {Panel,Grid,TimeView,_Timer}) ->
+  Seconds = (Timer-1) rem 60,
+  Minutes = (Timer-1) div 60,
+  if
+    (Seconds > 9) ->
+      wxStaticText:setLabel(TimeView,integer_to_list(Minutes)++":"++ integer_to_list(Seconds));
+    (Seconds >= 0) ->
+      wxStaticText:setLabel(TimeView,integer_to_list(Minutes)++":0"++ integer_to_list(Seconds))
+  end,
+  timer:send_after(1000, {newTime,Timer -1}),
+  F = fun() ->
+    mnesia:write(#gui_state{panel=Panel,grid=Grid,time=TimeView,timer=Timer-1}) end,
+  mnesia:transaction(F),
 
-handle_info(Info, State) ->
-  io:format("Got: ~p~n",[Info]),
+  {noreply, {Panel,Grid,TimeView,Timer-1}};
+
+
+handle_info(_Info, State) ->
   {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -272,7 +345,7 @@ handle_info(Info, State) ->
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
   io:format("GUI Server terminated ~n"),
-  ets:delete(colors),
+  %ets:delete(colors),
   ok.
 
 %%--------------------------------------------------------------------
@@ -344,3 +417,9 @@ draw_crate(Panel, X, Y, Pic)->
   wxDC:drawBitmap(ClientDC, Bitmap, {round(X+45-wxImage:getHeight(Pic)/2), round(Y-15+60-wxImage:getWidth(Pic)/2)}),
   wxBitmap:destroy(Bitmap),
   wxClientDC:destroy(ClientDC).
+
+local_ip_v4() ->
+  {ok, Addrs} = inet:getifaddrs(),
+  hd([Addr || {_, Opts} <- Addrs,
+    {addr, Addr} <- Opts,
+    size(Addr) == 4, Addr =/= {127,0,0,1}]).

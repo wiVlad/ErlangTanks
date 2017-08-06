@@ -12,7 +12,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -31,10 +31,12 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec(start_link() ->
+-spec(start_link(term()) ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
-start_link() ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+start_link(normal) ->
+  supervisor:start_link({local, ?SERVER}, ?MODULE, []);
+start_link([GameState,GuiState,CrateList,PlayerList]) ->
+  supervisor:start_link({local, ?SERVER}, ?MODULE, [GameState,GuiState,CrateList,PlayerList]).
 
 %%%===================================================================
 %%% Supervisor callbacks
@@ -64,12 +66,28 @@ init([]) ->
   SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
 
   Children = [
+    ?CHILD(game_manager, supervisor),
+    ?CHILD(udp_server, worker),
+    ?CHILD(gui_server, worker),
+    ?CHILD(shell_sup, supervisor),
+    ?CHILD(player_sup, supervisor),
+    ?CHILD(crate_sup, supervisor)
+    ],
+  {ok, {SupFlags, Children}};
+init([GameState,GuiState,CrateList,PlayerList]) ->
+  RestartStrategy = one_for_one,
+  MaxRestarts = 1000,
+  MaxSecondsBetweenRestarts = 3600,
+  SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
+
+  Children = [
+    ?CHILD(udp_server, worker),
+    ?CHILD(gui_server, worker),
     ?CHILD(shell_sup, supervisor),
     ?CHILD(player_sup, supervisor),
     ?CHILD(crate_sup, supervisor),
-    ?CHILD(gui_server, worker),
-    ?CHILD(udp_server, worker),
-    ?CHILD(game_manager, supervisor)],
+    {game_manager, {game_manager, start_link, [GameState,GuiState,PlayerList,CrateList]}, permanent, 5000, supervisor, [game_manager]}
+  ],
   {ok, {SupFlags, Children}}.
 
 %%%===================================================================
