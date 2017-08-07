@@ -45,24 +45,23 @@ start(normal, _StartArgs) ->
   mnesia:delete_table(game_state),
   mnesia:delete_table(gui_state),
   mnesia:delete_table(udp_state),
-  spawn(mnesia,stop,[]),
-  rpc:call(?BackupNode, application, stop, [mnesia]),
-  NodeList = [?MainNode,?BackupNode],
-  mnesia:delete_schema(NodeList),
-  mnesia:create_schema(NodeList),
-  mnesia:start(),
-  rpc:call(?BackupNode, application, start, [mnesia]),
+  %spawn(mnesia,stop,[]),
+  rpc:multicall(?NodeList, application, stop, [mnesia]),
+  %NodeList = [?MainNode|?BackupNodes],
+  mnesia:delete_schema(?NodeList),
+  mnesia:create_schema(?NodeList),
+  %mnesia:start(),
+  rpc:multicall(?NodeList, application, start, [mnesia]),
   mnesia:create_table(player_state,
-    [{attributes, record_info(fields, player_state)},{disc_copies, NodeList}]),
+    [{attributes, record_info(fields, player_state)},{disc_copies, ?NodeList}]),
   mnesia:create_table(crate_state,
-    [{attributes, record_info(fields, crate_state)},{disc_copies, NodeList}]),
+    [{attributes, record_info(fields, crate_state)},{disc_copies, ?NodeList}]),
   mnesia:create_table(gui_state,
-    [{attributes, record_info(fields, gui_state)},{disc_copies, NodeList}]),
+    [{attributes, record_info(fields, gui_state)},{disc_copies, ?NodeList}]),
   mnesia:create_table(game_state,
-    [{attributes, record_info(fields, game_state)},{disc_copies, NodeList}]),
+    [{attributes, record_info(fields, game_state)},{disc_copies, ?NodeList}]),
   mnesia:create_table(udp_state,
-    [{attributes, record_info(fields, udp_state)},{disc_copies, NodeList}]),
-  %mnesia:wait_for_tables([game_manager_tab], 5000),
+    [{attributes, record_info(fields, udp_state)},{disc_copies, ?NodeList}]),
   ets:new(ids, [set, named_table, public]),
   ets:new(colors, [set, named_table,public]),
   case game_sup:start_link(normal) of
@@ -90,13 +89,12 @@ start({failover,_Node}, _StartArgs) ->
     Error ->
       Error
   end;
-start({takeover,_Node}, _StartArgs) ->
+start({takeover,Node}, _StartArgs) ->
   io:format("not normal start: ~p~n", [takeover]),
   ets:new(ids, [set, named_table, public]),
   ets:new(colors, [set, named_table,public]),
-  mnesia:start(),
-  rpc:call(?BackupNode, ets, tab2list, [udp_state]),
-  [{udp_state,Sock, _Connections}] = rpc:call(?BackupNode, ets, tab2list, [udp_state]),
+  rpc:multicall(?NodeList, ets, tab2list, [udp_state]),
+  [{udp_state,Sock, _Connections}] = rpc:call(Node, ets, tab2list, [udp_state]),
   gen_udp:close(Sock),
   case game_sup:start_link(normal) of
     {ok, Pid} ->
@@ -147,10 +145,11 @@ delete_mnes() ->
   mnesia:delete_table(gui_state),
   mnesia:delete_table(udp_state),
   case node() of
-    ?MainNode -> spawn(?MainNode,mnesia,stop,[]),
-      rpc:call(?BackupNode, application, stop, [mnesia]);
-    ?BackupNode ->
-      spawn(?BackupNode,mnesia,stop,[])
+    ?MainNode -> %spawn(?MainNode,mnesia,stop,[]),
+      rpc:multicall(?NodeList, application, stop, [mnesia]);
+    _BackupNode ->
+      rpc:multicall(?BackupNodes,mnesia,stop,[])
+      %spawn(?BackupNode,mnesia,stop,[])
   end,
-  mnesia:delete_schema([?MainNode,?BackupNode]),
+  mnesia:delete_schema(?NodeList),
   ok.

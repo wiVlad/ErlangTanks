@@ -8,5 +8,6 @@
 -define(TANK_INTERVAL, 500).
 -define(GAME_LENGTH, 120). %in seconds
 -define(inRange(Xself,Xother,Yself,Yother), ((abs((Xother) - (Xself+5)) < 30) and (abs((Yother)-(Yself+5))<30))).
--define(MainNode, 'jon@jon-ubuntu').
--define(BackupNode, 'vlad@jon-ubuntu').
+-define(MainNode, 'jon@cs302row1-3').
+-define(BackupNodes, ['vlad@cs302row1-2','third@cs302row1-4']).
+-define(NodeList, [?MainNode|?BackupNodes]).
