@@ -2,7 +2,7 @@
 %%% @author vlad
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%%
+%%% Each crate in the game is a gen_server
 %%% @end
 %%% Created : 01. Aug 2017 10:08 AM
 %%%-------------------------------------------------------------------
@@ -35,14 +35,15 @@
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
-%%
+%% Two different start_link, one for normal startup, and one for failover startup-
+%% in which case the old crates need to be redrawn during initialization.
 %% @end
 %%--------------------------------------------------------------------
 -spec(start_link() ->
   {ok, Pid :: pid()} | ignore | {error, Reason :: term()}).
 start_link() ->
   gen_server:start_link(?MODULE, [0], []).
-
+%Receives old crate's data from game manager and re-creates it
 start_link(PID,X,Y,Type,Quantity) ->
   gen_server:start_link(?MODULE, [PID,X,Y,Type,Quantity], []).
 %%%===================================================================
@@ -52,7 +53,7 @@ start_link(PID,X,Y,Type,Quantity) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Initializes the server
+%% Initializes the server, generates random crate and plugs it into database
 %%
 %% @spec init(Args) -> {ok, State} |
 %%                     {ok, State, Timeout} |
@@ -121,7 +122,7 @@ handle_cast(_Request, State) ->
 %% @private
 %% @doc
 %% Handling all non call/cast messages
-%%
+%% Trigger - tells the crate to redraw itself and send it location to all players
 %% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, State}

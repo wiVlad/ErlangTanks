@@ -65,7 +65,7 @@ start_link(ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Amm
   {stop, Reason :: term()} | ignore).
 init([Name,Num, ID,BodyIm,TurretIm]) ->
   io:format("New Player, ID: ~p ~n", [ID]),
-  erlang:send_after(10000, self(), backup),
+  erlang:send_after(7000, self(), backup),
   erlang:send_after(?TANK_INTERVAL, self(), trigger),
   random:seed(erlang:phash2([node()]),
     erlang:monotonic_time(),
@@ -84,7 +84,7 @@ init([Name,Num, ID,BodyIm,TurretIm]) ->
   {ok, #state{id = ID,name = Name, num = Num, bodyIm = BodyIm,turretIm = TurretIm,xPos = NewX ,yPos = NewY,score = 0,bodyDir = 0, turretDir = 0, ammo = 50, hitPoints = 50}};
 init([ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, HitPoints]) ->
   io:format("Player recovered, ID: ~p ~n", [ID]),
-  erlang:send_after(10000, self(), backup),
+  erlang:send_after(7000, self(), backup),
   erlang:send_after(?TANK_INTERVAL, self(), trigger),
   gen_server:cast(gui_server, {grid, Name, Num, Ammo, HitPoints}),
   gen_server:cast(gui_server, {grid, Num, Ammo, HitPoints}),
@@ -109,45 +109,6 @@ init([ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, Hi
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
-handle_call({fire, ID}, _From, State = #state{ id = ID, num = Num, xPos = X, yPos = Y, hitPoints = HP, turretDir = Dir, ammo = Ammo}) ->
-  if
-    (Ammo > 0) ->
-      NewAmmo = Ammo - 1,
-      gen_server:call(gui_server, {grid,Num, NewAmmo,HP}),
-      shell_sup:start_new_shell(X,Y,Dir,self());
-    true -> NewAmmo = 0
-  end,
-
-  {reply, ok, State#state{ ammo = NewAmmo }};
-
-handle_call({moveBody,ID ,Xspeed, Yspeed,Angle}, _From, State = #state{ id = ID,bodyDir = BodyAngle,turretDir = TurretAngle ,bodyIm = BodyIm,turretIm = TurretIm, xPos = Xcur, yPos = Ycur}) ->
-  if
-    (((Xspeed + Xcur) >= 0) and ((Xspeed + Xcur) =< 1080-90)) ->
-      NewX = Xcur + Xspeed;
-    true ->
-      NewX = Xcur
-  end,
-  if
-    (((Yspeed + Ycur) >= 0) and ((Yspeed + Ycur) =< 720-90)) ->
-      NewY = Ycur + Yspeed;
-    true ->
-      NewY = Ycur
-  end,
-  if (Angle =:= 0) ->
-    EffAngle =  BodyAngle;
-    true -> EffAngle = Angle
-  end,
-
-  gen_server:cast(gui_server, {body,BodyIm,TurretIm, Xcur, Ycur, NewX,NewY,EffAngle, TurretAngle}),
-  {reply, ok, State#state{ xPos = NewX, yPos = NewY, bodyDir = EffAngle}};
-
-handle_call({moveTurret,ID, Angle}, _From, State = #state{ id= ID,bodyIm = BodyIm,turretIm = TurretIm, xPos = Xcur, yPos = Ycur, turretDir = TurretAngle, bodyDir = BodyAngle }) ->
-  if (Angle =:= 0) ->
-    EffAngle =  TurretAngle;
-    true -> EffAngle = Angle
-  end,
-  gen_server:cast(gui_server, {turret,BodyIm,TurretIm, Xcur, Ycur, EffAngle, BodyAngle}),
-  {reply, ok, State#state{turretDir = EffAngle}};
 handle_call(exit, _From, State = #state{ num = Num, xPos =  X, yPos= Y}) ->
   gen_server:cast(gui_server, {erase,{Num,X,Y}}),
   {reply, ok, State};
@@ -186,6 +147,7 @@ handle_cast({hit,ShellX,ShellY, From, PlayerPid}, State = #state{ id = ID, num =
     (HPn < 1) ->
       gen_server:cast(PlayerPid, {score}),
       io:format("~nplayer ~p terminated~n",[ID]),
+      gen_server:cast(gui_server, {erase,{Num,X,Y}}),
       gen_server:cast(udp_server, {exit,ID}),
       gen_server:cast(game_manager, {kill_player,ID});
 
@@ -225,7 +187,7 @@ handle_cast({fire, ID}, State = #state{ id = ID, num = Num, xPos = X, yPos = Y, 
   if
     (Ammo > 0) ->
       NewAmmo = Ammo - 1,
-      gen_server:call(gui_server, {grid,Num, NewAmmo,HP}),
+      gen_server:cast(gui_server, {grid,Num, NewAmmo,HP}),
       shell_sup:start_new_shell(X,Y,Dir,self());
     true -> NewAmmo = 0
   end,

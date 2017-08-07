@@ -2,7 +2,7 @@
 %%% @author jon
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%%
+%%% The shells being fired from the tanks
 %%% @end
 %%% Created : 05. Jul 2017 21:14
 %%%-------------------------------------------------------------------
@@ -49,8 +49,8 @@ start_link(X,Y,Dir,PlayerPid) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Initializes the server
-%%
+%% Initializes the server, sets the shells direction in correlation with the
+%% tank's turret that fired it.
 %% @spec init(Args) -> {ok, State} |
 %%                     {ok, State, Timeout} |
 %%                     ignore |
@@ -103,7 +103,7 @@ handle_cast(_Request, State) ->
 %% @private
 %% @doc
 %% Handling all non call/cast messages
-%%
+%% The trigger message tells the GUI to redraw the shell in its new position.
 %% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, State}
@@ -115,7 +115,7 @@ handle_cast(_Request, State) ->
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(trigger, State = #state{x=X,y=Y,dir=Dir,xinc=Xspeed,yinc=Yspeed,playerPid=PlayerPid}) ->
   if
-    ((X<1200) and (X > -30) and (Y < 800) and (Y>-30)) ->
+    ((X<1200) and (X > -45) and (Y < 800) and (Y>-45)) ->
       gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
       lists:foreach(fun({_Ip,Pid}) ->
         if

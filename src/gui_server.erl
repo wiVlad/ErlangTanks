@@ -173,44 +173,7 @@ init([]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call(Request, _From, {Panel,Grid,TimeView,Timer}) ->
-  case Request of
-    {new,_PlayerName,BodyIm,TurretIm,PosX,PosY,Angle} ->
-      Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
-      draw_body(Panel, {PosX,PosY}, Body,Angle),
-      draw_turret(Panel, {PosX,PosY},Turret,Angle);
 
-    {body,BodyIm,TurretIm,OldX,OldY,NewX,NewY,EffAngle,OldTurretAngle} ->
-      Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
-      draw_background(Panel, OldX-15,OldY-10, wxImage:getWidth(Body)+30,wxImage:getHeight(Body)+25),
-      draw_body(Panel, {NewX,NewY}, Body,EffAngle),
-      draw_turret(Panel, {NewX,NewY},Turret,OldTurretAngle);
-     % State = {Panel, maps:update(Player,{{Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{EffAngle,OldTurretAngle}}, Tanks)};
-
-    {turret,BodyIm,TurretIm,PosX,PosY, EffAngle, OldBodyAngle}  ->
-      Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
-      draw_background(Panel, PosX,PosY-5, wxImage:getWidth(Body),wxImage:getHeight(Body)+10),
-      draw_body(Panel, {PosX,PosY}, Body,OldBodyAngle),
-      draw_turret(Panel, {PosX,PosY},Turret,EffAngle);
-     % State = {Panel, maps:update(Player,{{Body,Turret}, {PosX,PosY},{SpeedX,SpeedY},{OldBodyAngle,EffAngle}}, Tanks)};
-    {shell, X, Y, NewX,NewY,Dir} ->
-      EraseShell = wxImage:new("Graphics/eraseShell.png"),
-      ShellPic = wxImage:new("Graphics/Shell.png"),
-      draw_shell(Panel, X, Y, NewX, NewY, ShellPic, EraseShell, Dir);
-    {grid,Name, Num, _Ammo, _HP} ->
-      wxGrid:setRowLabelValue(Grid, Num, Name);
-    {grid, Num, Score} ->
-      wxGrid:setCellValue(Grid, Num, 2,integer_to_list(Score));
-    {grid, Num, Ammo, HP} ->
-      wxGrid:setCellValue(Grid, Num, 1,integer_to_list(HP)),
-      wxGrid:setCellValue(Grid, Num, 0,integer_to_list(Ammo) );
-    {explosion, X, Y} ->
-      draw_explosion(Panel, X, Y);
-    {background, X, Y,SizeX,SizeY} ->
-      draw_background(Panel, X-15,Y-10, SizeX,SizeY)
-
-  end,
-  {reply, ok, {Panel,Grid,TimeView,Timer}};
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
@@ -269,7 +232,10 @@ handle_cast(Request, {Panel,Grid,TimeView,Timer}) ->
       draw_crate(Panel, X, Y, CratePic);
     {erase, {Num,X,Y}} ->
       wxGrid:deleteRows(Grid, [{pos, Num},{numRows, 1}]),
-      draw_background(Panel, X-15,Y-10, 90+30,90+25);
+      draw_background(Panel, X-15,Y-10, 90+30,90+25),
+      F = fun() ->
+        mnesia:write(#gui_state{panel=Panel,grid=Grid,time=TimeView,timer=Timer}) end,
+      mnesia:transaction(F);
     {winner, PlayerName} ->
       D = wxMessageDialog:new(Panel,"The Winner is "++PlayerName++"!"),
       wxMessageDialog:showModal(D)

@@ -49,6 +49,7 @@ handle_cast({new_ip,Ip}, {Connections,Sock}) ->
   {noreply, {Connections,Sock}}.
 
 handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
+  %io:format("~nreceived something ~p",[Msg]),
   Temp = re:split(Msg, "[ ]",[{return,list}]),
   case Temp of
     [_PlayerName, "connection","successful"] ->
@@ -58,7 +59,7 @@ handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
       mnesia:transaction(F);
     ["exit"]  ->
       NewConnections = lists:delete(Ip,Connections),
-      io:format("~n ~p has left the room~n", [Ip]),
+      io:format("~p has left the room~n", [Ip]),
       F = fun() ->
         mnesia:write(#udp_state{socket = Sock,connections = NewConnections}) end,
       mnesia:transaction(F);
@@ -72,7 +73,6 @@ handle_info(Msg, LoopData) ->
   {noreply, LoopData}.
 
 send(Msg) ->
-
   gen_server:call(?MODULE, {message, Msg}).
 
 handle_call(exit, _From, {Connections,Sock}) ->

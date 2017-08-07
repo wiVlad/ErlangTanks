@@ -2,7 +2,7 @@
 %%% @author jon
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%%
+%%% The game manager, handles communication between players,crates,the gui, and the udp server.
 %%% @end
 %%% Created : 24. Jun 2017 17:50
 %%%-------------------------------------------------------------------
@@ -32,8 +32,8 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Starts the server
-%%
+%% Starts the server,
+%% The second start_link is in case of failover, where the old data is reconfigured into the game
 %% @end
 %%--------------------------------------------------------------------
 -spec(start_link() ->
@@ -50,8 +50,8 @@ start_link(GameState,GuiState,PlayerList,CrateList) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%% Initializes the server
-%%
+%% Initializes the server, writes it into database
+%% In case of failover, reconfigures the game from old state
 %% @spec init(Args) -> {ok, State} |
 %%                     {ok, State, Timeout} |
 %%                     ignore |
@@ -62,8 +62,7 @@ start_link(GameState,GuiState,PlayerList,CrateList) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  erlang:send_after(10000, self(), backup),
-  %ets:new(ids, [set, named_table, public]),
+  erlang:send_after(2000, self(), backup),
   process_flag(trap_exit, true),
   io:format("Game Manager Online ~n"),
   F = fun() ->
@@ -71,11 +70,11 @@ init([]) ->
   mnesia:transaction(F),
   {ok, #state{gameInProgress = false, numOfPlayers =  0}};
 init([GameState,GuiState,PlayerList,CrateList]) ->
-  erlang:send_after(10000, self(), backup),
+  erlang:send_after(2000, self(), backup),
   %ets:new(ids, [set, named_table, public]),
   process_flag(trap_exit, true),
   io:format("Game Manager recovered ~n"),
-  [{game_state,_Pid, GameStatus, NumOfPlayers}] = GameState,
+  {game_state,_Pid, GameStatus, NumOfPlayers} = hd(GameState),
   [{gui_state,_Panel, _Grid,_TimeView,Timer}] = GuiState,
   lists:foreach(fun(E)->
     {player_state,ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, HitPoints}=E,
@@ -108,54 +107,7 @@ init([GameState,GuiState,PlayerList,CrateList]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call({_Sock,Ip,Request}, _From, State = #state{gameInProgress = true, numOfPlayers =  Num}) ->
 
-  Msg = re:split(Request, "[ ]",[{return,list}]),
-
-  case Msg of
-    [_PlayerName, "connection","successful"] ->
-      NewNum = Num,
-      NewStatus = true;
-    ["FIRE"] ->
-      NewNum = Num,
-      NewStatus = true,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      gen_server:call(Pid, {fire, Ip});
-    ["exit"] ->
-      NewStatus = true,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      NewNum = Num -1,
-      supervisor:terminate_child(player_sup,Pid);
-    ["Turret", Angle] ->
-      NewNum = Num,
-      NewStatus = true,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      gen_server:call(Pid, {moveTurret, Ip, list_to_integer(Angle)});
-    ["Body", X, Y, Angle] ->
-      NewNum = Num,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
-      gen_server:call(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)}),
-      if
-        (NewNum == 1) ->  NewStatus = false,
-          gen_server:cast(Pid, {winner});
-        true -> NewStatus = true
-      end
-
-  end,
-  {reply, ok, State#state{gameInProgress = NewStatus,numOfPlayers =  NewNum}};
-
-handle_call({Sock,Ip,Request}, _From, State = #state{gameInProgress = false, numOfPlayers =  Num}) ->
-  Msg = re:split(Request, "[ ]",[{return,list}]),
-
-  case Msg of
-    [PlayerName, "connection","successful"] ->
-      {ok, PID} = player_sup:start_player(PlayerName, Ip, Num),
-      gen_udp:send(Sock, Ip, 4000, list_to_binary("connected")),
-      NewNum = Num + 1,
-      ets:insert(ids, {Ip, PID});
-    _Any -> NewNum = Num
-  end,
-  {reply, ok, State#state{numOfPlayers = NewNum}};
 handle_call(_Request, _From, State) ->
   {reply, ok, State}.
 
@@ -195,7 +147,6 @@ handle_cast(endGame, State = #state{gameInProgress = true}) ->
   {noreply, State#state{gameInProgress = false}};
 handle_cast({Sock,Ip,Request}, State = #state{gameInProgress = false, numOfPlayers =  Num}) ->
   Msg = re:split(Request, "[ ]",[{return,list}]),
-
   case Msg of
     [PlayerName, "connection","successful"] ->
       {ok, PID} = player_sup:start_player(PlayerName, Ip, Num),
@@ -205,7 +156,6 @@ handle_cast({Sock,Ip,Request}, State = #state{gameInProgress = false, numOfPlaye
     _Any -> NewNum = Num
   end,
   {noreply, State#state{numOfPlayers = NewNum}};
-
 
 handle_cast({_Sock,Ip,Request}, State = #state{gameInProgress = true, numOfPlayers =  Num}) ->
   Msg = re:split(Request, "[ ]",[{return,list}]),
@@ -291,7 +241,6 @@ handle_info(_Info, State) ->
 -spec(terminate(Reason :: (normal | shutdown | {shutdown, term()} | term()),
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
-  %mnesia:delete(game_manager_tab),
   io:format("Game server terminated~n"),
   %ets:delete(ids),
   ok.

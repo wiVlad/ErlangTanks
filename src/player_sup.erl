@@ -2,7 +2,7 @@
 %%% @author vlad
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%%
+%%% The player supervisor, supervises over all the players/tanks that are in the current game.
 %%% @end
 %%% Created : 07. Jul 2017 10:12 AM
 %%%-------------------------------------------------------------------
@@ -13,7 +13,7 @@
 
 %% API
 -export([
-  start_link/0,start_link/1,
+  start_link/0,
   start_player/3
   ]).
 
@@ -38,8 +38,7 @@
 
 start_link() ->
   supervisor:start_link({local, ?SERVER}, ?MODULE, []).
-start_link(PlayerList) ->
-  supervisor:start_link({local, ?SERVER}, ?MODULE, [PlayerList]).
+
 %%%===================================================================
 %%% Supervisor callbacks
 %%%===================================================================
@@ -63,7 +62,7 @@ start_link(PlayerList) ->
   {error, Reason :: term()}).
 
 init([]) ->
-
+    %7 different colored tanks and turrets
     ets:insert(colors, [{"Graphics/redBody.png","Graphics/redTurret.png"},
       {"Graphics/blueBody.png","Graphics/blueTurret.png"},
       {"Graphics/cyanBody.png","Graphics/cyanTurret.png"},
@@ -83,38 +82,12 @@ init([]) ->
   AChild = {'?MODULE', {'player', start_link, []},
     Restart, Shutdown, Type, ['player']},
   io:format("Players Supervisor online ~n"),
-  {ok, {SupFlags, [AChild]}};
-init([PlayerList]) ->
-
-  ets:insert(colors, [{"Graphics/redBody.png","Graphics/redTurret.png"},
-    {"Graphics/blueBody.png","Graphics/blueTurret.png"},
-    {"Graphics/cyanBody.png","Graphics/cyanTurret.png"},
-    {"Graphics/greenBody.png","Graphics/greenTurret.png"},
-    {"Graphics/purpleBody.png","Graphics/purpleTurret.png"},
-    {"Graphics/greyBody.png","Graphics/greyTurret.png"},
-    {"Graphics/yellowBody.png","Graphics/yellowTurret.png"}]),
-
-  RestartStrategy = simple_one_for_one,
-  MaxRestarts = 1000,
-  MaxSecondsBetweenRestarts = 3600,
-  SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
-  Restart = permanent,
-  Shutdown = 2000,
-  Type = worker,
-
-  AChild = {'?MODULE', {'player', start_link, []},
-    Restart, Shutdown, Type, ['player']},
-  io:format("Players Supervisor recovered ~n"),
-  lists:foreach(fun(E)->
-    {player_state,ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, HitPoints}=E,
-    supervisor:start_child(?MODULE, [ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Ammo, HitPoints])
-                end,PlayerList),
   {ok, {SupFlags, [AChild]}}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===========================  ========================================
-
+%Starts a new player, gives it a colored tanked image
 start_player(Name, ID, Num) ->
   BodyIm = ets:first(colors),
   {_Key,TurretIm} = hd(ets:lookup(colors,BodyIm)),

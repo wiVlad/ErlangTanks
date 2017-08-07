@@ -2,7 +2,7 @@
 %%% @author vlad
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%%
+%%% Shell supervisor, supervises over all the shells (pagazim)
 %%% @end
 %%% Created : 07. Jul 2017 10:12 AM
 %%%-------------------------------------------------------------------
@@ -61,8 +61,6 @@ start_link() ->
   {error, Reason :: term()}).
 
 init([]) ->
-  %mnesia:create_table(shell_sup_tab, []),
-  %process_flag(trap_exit, true),
   RestartStrategy = simple_one_for_one,
   MaxRestarts = 1000,
   MaxSecondsBetweenRestarts = 3600,
