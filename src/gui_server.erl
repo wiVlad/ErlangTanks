@@ -239,7 +239,6 @@ handle_cast(Request, {Panel,Grid,TimeView,Timer}) ->
       draw_background(Panel, OldX-15,OldY-10, wxImage:getWidth(Body)+30,wxImage:getHeight(Body)+25),
       draw_body(Panel, {NewX,NewY}, Body,EffAngle),
       draw_turret(Panel, {NewX,NewY},Turret,OldTurretAngle);
-    % State = {Panel, maps:update(Player,{{Body,Turret}, {PosX+SpeedX,PosY+SpeedY},{SpeedX,SpeedY},{EffAngle,OldTurretAngle}}, Tanks)};
 
     {turret,BodyIm,TurretIm,PosX,PosY, EffAngle, OldBodyAngle}  ->
       Body = wxImage:new(BodyIm), Turret = wxImage:new(TurretIm),
@@ -296,6 +295,7 @@ handle_info({wx,1,A,_B,_C}, State) ->
   wxButton:disable(A),
   io:format("START!~n"),
   timer:send_after(1000, {newTime,?GAME_LENGTH}),
+  timer:send_after(5000, backup),
   gen_server:cast(game_manager,startGame),
   {noreply, State};
 
@@ -309,7 +309,7 @@ handle_info(backup, {Panel,Grid,TimeView,Timer}) ->
   F = fun() ->
     mnesia:write(#gui_state{panel=Panel,grid=Grid,time=TimeView,timer=Timer}) end,
   mnesia:transaction(F),
-  timer:send_after(10000, backup),
+  timer:send_after(5000, backup),
   {noreply, {Panel,Grid,TimeView,Timer}};
 handle_info({newTime,0}, {Panel,Grid,TimeView,Timer}) ->
   wxStaticText:setLabel(TimeView,"0:00"),
@@ -330,7 +330,6 @@ handle_info({newTime,Timer}, {Panel,Grid,TimeView,_Timer}) ->
   F = fun() ->
     mnesia:write(#gui_state{panel=Panel,grid=Grid,time=TimeView,timer=Timer-1}) end,
   mnesia:transaction(F),
-  timer:send_after(10000, backup),
   {noreply, {Panel,Grid,TimeView,Timer-1}};
 
 

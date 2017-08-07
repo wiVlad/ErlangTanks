@@ -120,5 +120,4 @@ start_player(Name, ID, Num) ->
   {_Key,TurretIm} = hd(ets:lookup(colors,BodyIm)),
   ets:delete(colors,BodyIm),
   Pid = supervisor:start_child(?MODULE, [Name,Num,ID,BodyIm,TurretIm]),
-  io:format("~n~n~p~n~n",[Pid]),
   Pid.

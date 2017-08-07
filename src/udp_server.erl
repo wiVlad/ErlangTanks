@@ -43,7 +43,8 @@ handle_cast({exit,Ip}, {Connections,Sock}) ->
   {noreply, {NewConnections,Sock}};
 handle_cast({new_ip,Ip}, {Connections,Sock}) ->
   {A,B,C,D} = (local_ip_v4()),
-  Address = integer_to_list(A)++"."++integer_to_list(B)++"."++integer_to_list(C)++"."++integer_to_list(D),
+  Address = "reco " ++ integer_to_list(A)++"."++integer_to_list(B)++"."++integer_to_list(C)++"."++integer_to_list(D)++".",
+  io:format("~nsending: ~p~n",[Address]),
   gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary(Address)),
   {noreply, {Connections,Sock}}.
 

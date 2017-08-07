@@ -40,7 +40,6 @@
 
 start(normal, _StartArgs) ->
   io:format("normal start~n"),
-  %application:set_env(mnesia, dir, "mnes/"),
   mnesia:delete_table(player_state),
   mnesia:delete_table(crate_state),
   mnesia:delete_table(game_state),
@@ -76,7 +75,6 @@ start({failover,_Node}, _StartArgs) ->
   io:format("not normal start: ~p~n", [failover]),
   ets:new(ids, [set, named_table, public]),
   ets:new(colors, [set, named_table,public]),
-  io:format("~n~p",[mnesia:info()]),
   [{udp_state, Sock, _Connections}] = ets:tab2list(udp_state),
   mnesia:transaction(fun() -> mnesia:delete({udp_state, Sock}) end),
   gen_udp:close(Sock),
@@ -97,8 +95,7 @@ start({takeover,_Node}, _StartArgs) ->
   ets:new(ids, [set, named_table, public]),
   ets:new(colors, [set, named_table,public]),
   mnesia:start(),
-  io:format("~n~p",[mnesia:info()]),
-  io:format("~n~p",[rpc:call(?BackupNode, ets, tab2list, [udp_state])]),
+  rpc:call(?BackupNode, ets, tab2list, [udp_state]),
   [{udp_state,Sock, _Connections}] = rpc:call(?BackupNode, ets, tab2list, [udp_state]),
   gen_udp:close(Sock),
   case game_sup:start_link(normal) of
