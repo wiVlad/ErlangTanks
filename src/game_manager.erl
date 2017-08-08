@@ -159,6 +159,8 @@ handle_cast({Sock,Ip,Request}, State = #state{gameInProgress = false, numOfPlaye
 
 handle_cast({_Sock,Ip,Request}, State = #state{gameInProgress = true, numOfPlayers =  Num}) ->
   Msg = re:split(Request, "[ ]",[{return,list}]),
+  case ets:lookup(ids,Ip) of
+    [{Ip,Pid}] ->
   case Msg of
     [_PlayerName, "connection","successful"] ->
       NewNum = Num,
@@ -166,11 +168,11 @@ handle_cast({_Sock,Ip,Request}, State = #state{gameInProgress = true, numOfPlaye
     ["FIRE"] ->
       NewNum = Num,
       NewStatus = true,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:cast(Pid, {fire, Ip});
     ["exit"] ->
       NewStatus = true,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       ets:delete(ids,Ip),
       gen_server:call(Pid, exit),  %to erase tank from gui
       F = fun() ->
@@ -181,11 +183,11 @@ handle_cast({_Sock,Ip,Request}, State = #state{gameInProgress = true, numOfPlaye
     ["Turret", Angle] ->
       NewNum = Num,
       NewStatus = true,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:cast(Pid, {moveTurret, Ip, list_to_integer(Angle)});
     ["Body", X, Y, Angle] ->
       NewNum = Num,
-      [{Ip, Pid}] = ets:lookup(ids, Ip),
+      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:cast(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)}),
       if
         (NewNum == -1) ->  NewStatus = false,
@@ -193,6 +195,8 @@ handle_cast({_Sock,Ip,Request}, State = #state{gameInProgress = true, numOfPlaye
         true -> NewStatus = true
       end
 
+  end;
+    _Anything -> NewNum = Num, NewStatus = true
   end,
   {noreply, State#state{gameInProgress = NewStatus,numOfPlayers =  NewNum}};
 
