@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0,start_link/1]).
+-export([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -42,8 +42,6 @@
 start_link() ->
   gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
-start_link(GuiState) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [GuiState], []).
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -65,13 +63,8 @@ start_link(GuiState) ->
 init([]) ->
   io:format("GUI Server online ~n"),
   process_flag(trap_exit, true),
-
-  %ets:new(colors, [set, named_table,public]),
-
   Wx = wx:new(),
   Frame = wxFrame:new(Wx, -1, "Main Game Frame", [ {pos, {0,0}}, {size, {1320,720}}]),
-  MenuBar = wxMenuBar:new(),
-  wxFrame:setMenuBar(Frame, MenuBar),
   Panel = wxPanel:new(Frame, [{pos, {0,0}},{size,{1080,720}},{style, ?wxBORDER_DOUBLE}]),
   Panel2 = wxPanel:new(Frame, [{pos, {1080,0}},{size,{240,720}},{style, ?wxBORDER_DOUBLE}]),
 
@@ -97,7 +90,6 @@ init([]) ->
     round(wxImage:getHeight(Image)*0.25),
     [{quality, ?wxIMAGE_QUALITY_HIGH}])),
   StaticBitmap = wxStaticBitmap:new(Panel2, 1, Bitmap),
-
 
   B_Start = wxButton:new(Panel2, 1, [{label,"Start"},{size, {80, 30}}]),
   B_Quit = wxButton:new(Panel2, 2, [{label,"Quit"}, {size, {80, 30}}]),

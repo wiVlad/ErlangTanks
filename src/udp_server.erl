@@ -48,8 +48,8 @@ handle_cast({new_ip,Ip}, {Connections,Sock}) ->
   gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary(Address)),
   {noreply, {Connections,Sock}}.
 
+%Receives data packets from the players android devices
 handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
-  %io:format("~nreceived something ~p",[Msg]),
   Temp = re:split(Msg, "[ ]",[{return,list}]),
   case Temp of
     [_PlayerName, "connection","successful"] ->

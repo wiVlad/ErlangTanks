@@ -9,5 +9,5 @@
 -define(GAME_LENGTH, 120). %in seconds
 -define(inRange(Xself,Xother,Yself,Yother), ((abs((Xother) - (Xself+5)) < 30) and (abs((Yother)-(Yself+5))<30))).
 -define(MainNode, 'jon@jon-ubuntu').
--define(BackupNodes, ['vlad@ron-Inspiron-7559']).
+-define(BackupNodes, ['vlad@jon-ubuntu']).
 -define(NodeList, [?MainNode|?BackupNodes]).

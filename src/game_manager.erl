@@ -62,7 +62,7 @@ start_link(GameState,GuiState,PlayerList,CrateList) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([]) ->
-  erlang:send_after(2000, self(), backup),
+  erlang:send_after(2000, self(), backup), %send periodic signal to itself to update the database
   process_flag(trap_exit, true),
   io:format("Game Manager Online ~n"),
   F = fun() ->
@@ -71,7 +71,6 @@ init([]) ->
   {ok, #state{gameInProgress = false, numOfPlayers =  0}};
 init([GameState,GuiState,PlayerList,CrateList]) ->
   erlang:send_after(2000, self(), backup),
-  %ets:new(ids, [set, named_table, public]),
   process_flag(trap_exit, true),
   io:format("Game Manager recovered ~n"),
   {game_state,_Pid, GameStatus, NumOfPlayers} = hd(GameState),
@@ -86,9 +85,11 @@ init([GameState,GuiState,PlayerList,CrateList]) ->
     {crate_state,PID,X,Y,Type,Quantity}=E,
     supervisor:start_child(crate_sup, [PID,X,Y,Type,Quantity])
                 end,CrateList),
-  if (GameStatus == true) ->
-    gui_server ! {newTime,Timer},
-    gen_server:cast(game_manager,startGame)
+  if
+    (GameStatus == true) ->
+      gui_server ! {newTime,Timer},
+      gen_server:cast(game_manager,startGame);
+    true -> ok
   end,
   {ok, #state{ gameInProgress = GameStatus, numOfPlayers =  NumOfPlayers}}.
 

@@ -40,17 +40,16 @@
 
 start(normal, _StartArgs) ->
   io:format("normal start~n"),
+  %First clear any existing mnesia data on the participating nodes
   mnesia:delete_table(player_state),
   mnesia:delete_table(crate_state),
   mnesia:delete_table(game_state),
   mnesia:delete_table(gui_state),
   mnesia:delete_table(udp_state),
-  %spawn(mnesia,stop,[]),
   rpc:multicall(?NodeList, application, stop, [mnesia]),
-  %NodeList = [?MainNode|?BackupNodes],
   mnesia:delete_schema(?NodeList),
+  %Now restart the mnesia database and create the tables on all nodes
   mnesia:create_schema(?NodeList),
-  %mnesia:start(),
   rpc:multicall(?NodeList, application, start, [mnesia]),
   mnesia:create_table(player_state,
     [{attributes, record_info(fields, player_state)},{disc_copies, ?NodeList}]),
@@ -62,6 +61,7 @@ start(normal, _StartArgs) ->
     [{attributes, record_info(fields, game_state)},{disc_copies, ?NodeList}]),
   mnesia:create_table(udp_state,
     [{attributes, record_info(fields, udp_state)},{disc_copies, ?NodeList}]),
+  %Two additions ets that are final
   ets:new(ids, [set, named_table, public]),
   ets:new(colors, [set, named_table,public]),
   case game_sup:start_link(normal) of
@@ -74,7 +74,7 @@ start({failover,_Node}, _StartArgs) ->
   io:format("not normal start: ~p~n", [failover]),
   ets:new(ids, [set, named_table, public]),
   ets:new(colors, [set, named_table,public]),
-  [{udp_state, Sock, _Connections}] = ets:tab2list(udp_state),
+  io:format("~p~n",[[{udp_state, Sock, _Connections}] = ets:tab2list(udp_state)]),
   mnesia:transaction(fun() -> mnesia:delete({udp_state, Sock}) end),
   gen_udp:close(Sock),
 
