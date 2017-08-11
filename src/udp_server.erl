@@ -25,6 +25,7 @@ init(_Params) ->
   mnesia:transaction(F),
   {ok, {[], Sock}}.
 
+%Send an exit signal to all Android devices once the game is terminated
 terminate(_Reason, {Connections, Sock}) ->
   io:format("UDP Server terminated~n"),
   lists:foreach(fun(A) ->
@@ -37,10 +38,13 @@ terminate(_Reason, {Connections, Sock}) ->
 
   gen_udp:close(Sock).
 
+%Send an exit signal to a specific player
 handle_cast({exit,Ip}, {Connections,Sock}) ->
   NewConnections = lists:delete(Ip,Connections),
   gen_udp:send(Sock, Ip, ?SERVER_PORT, list_to_binary("exit")),
   {noreply, {NewConnections,Sock}};
+
+%Send the new server IP to all connected players after failover
 handle_cast({new_ip,Ip}, {Connections,Sock}) ->
   {A,B,C,D} = (local_ip_v4()),
   Address = "reco " ++ integer_to_list(A)++"."++integer_to_list(B)++"."++integer_to_list(C)++"."++integer_to_list(D)++".",
@@ -56,13 +60,13 @@ handle_info({udp, _Client, Ip, _Port, Msg}, {Connections,Sock}) ->
       NewConnections = [Ip|Connections],
       F = fun() ->
         mnesia:write(#udp_state{socket = Sock,connections = NewConnections}) end,
-      mnesia:transaction(F);
+      mnesia:transaction(F); %Insert new connection to database
     ["exit"]  ->
       NewConnections = lists:delete(Ip,Connections),
       io:format("~p has left the room~n", [Ip]),
       F = fun() ->
         mnesia:write(#udp_state{socket = Sock,connections = NewConnections}) end,
-      mnesia:transaction(F);
+      mnesia:transaction(F); %Remove connection from database
     _A -> NewConnections = Connections
   end,
   gen_server:cast(game_manager, {Sock,Ip,Msg}),
@@ -86,6 +90,7 @@ handle_call(exit, _From, {Connections,Sock}) ->
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
 
+%Get host IP
 local_ip_v4() ->
   {ok, Addrs} = inet:getifaddrs(),
   hd([Addr || {_, Opts} <- Addrs,

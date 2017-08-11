@@ -68,7 +68,8 @@ init([]) ->
   F = fun() ->
     mnesia:write(#game_state{pid = self(), gameInProgress = false, numOfPlayers =  0}) end,
   mnesia:transaction(F),
-  {ok, #state{gameInProgress = false, numOfPlayers =  0}};
+  {ok, #state{gameInProgress = false, numOfPlayers =  0}};  %The game starts with gameInProgress = false
+%Recreate the game on the new backup node from the spot where the old one crashed
 init([GameState,GuiState,PlayerList,CrateList]) ->
   erlang:send_after(2000, self(), backup),
   process_flag(trap_exit, true),
@@ -123,6 +124,8 @@ handle_call(_Request, _From, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
+
+%Kill a player when his Health Points reach 0
 handle_cast({kill_player,Ip}, State = #state{numOfPlayers = Num} ) ->
   case ets:lookup(ids,Ip) of
   [{Ip, Pid}] ->
@@ -130,22 +133,31 @@ handle_cast({kill_player,Ip}, State = #state{numOfPlayers = Num} ) ->
       gen_server:call(Pid, exit),  %to erase tank from gui
       F = fun() ->
         mnesia:delete({player_state, Ip}) end,
-      mnesia:transaction(F),
+      mnesia:transaction(F), %remove from database
       NewNum = Num -1,
       supervisor:terminate_child(player_sup,Pid);
     [] -> NewNum = Num
   end,
   {noreply, State#state{numOfPlayers = NewNum}};
+
+%Kill a shell process once it hits a tank or leaves boundaries of frame
 handle_cast({kill_shell,Pid}, State ) ->
   supervisor:terminate_child(shell_sup,Pid),
   {noreply, State};
+
+%Start the game once "START" button has been pressed in GUI,
+%Backup the game_manager every 5 seconds
 handle_cast(startGame, State = #state{gameInProgress = _Anything}) ->
   io:format("Game manager ack start ~n"),
   erlang:send_after(5000+?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
   {noreply, State#state{gameInProgress = true}};
+
+%Game has ended if timer reaches 0
 handle_cast(endGame, State = #state{gameInProgress = true}) ->
   io:format("Game ended ~n"),
   {noreply, State#state{gameInProgress = false}};
+
+%Receive message from UDP and pass it on to the player process
 handle_cast({Sock,Ip,Request}, State = #state{gameInProgress = false, numOfPlayers =  Num}) ->
   Msg = re:split(Request, "[ ]",[{return,list}]),
   case Msg of
@@ -169,29 +181,25 @@ handle_cast({_Sock,Ip,Request}, State = #state{gameInProgress = true, numOfPlaye
     ["FIRE"] ->
       NewNum = Num,
       NewStatus = true,
-      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:cast(Pid, {fire, Ip});
     ["exit"] ->
       NewStatus = true,
-      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       ets:delete(ids,Ip),
       gen_server:call(Pid, exit),  %to erase tank from gui
       F = fun() ->
         mnesia:delete({player_state, Ip}) end,
-      mnesia:transaction(F),
+      mnesia:transaction(F), %remove from database
       NewNum = Num -1,
       supervisor:terminate_child(player_sup,Pid);
     ["Turret", Angle] ->
       NewNum = Num,
       NewStatus = true,
-      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:cast(Pid, {moveTurret, Ip, list_to_integer(Angle)});
     ["Body", X, Y, Angle] ->
       NewNum = Num,
-      %[{Ip, Pid}] = ets:lookup(ids, Ip),
       gen_server:cast(Pid, {moveBody, Ip ,list_to_integer(X), list_to_integer(Y),list_to_integer(Angle)}),
-      if
-        (NewNum == -1) ->  NewStatus = false,
+      if  %If only 1 player remains, the winner is declared.
+        (NewNum == -1) ->  NewStatus = false,  % -1 for debugging purposes
           gen_server:cast(Pid, {winner});
         true -> NewStatus = true
       end
@@ -219,10 +227,13 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
+%Start a new crate and start random time interval to create a new one
 handle_info(crateTrigger, State = #state{gameInProgress = true}) ->
   crate_sup:start_new_crate(),
   erlang:send_after(?CRATE_MIN_INTERVAL+random:uniform(?CRATE_RANGE_INTERVAL), self(), crateTrigger),
   {noreply, State};
+
+%Backup the game manager every 10 seconds
 handle_info(backup, State = #state{gameInProgress = Status,numOfPlayers = Num}) ->
   F = fun() ->
     mnesia:write(#game_state{pid = self(), gameInProgress = Status,numOfPlayers = Num}) end,
@@ -247,7 +258,6 @@ handle_info(_Info, State) ->
     State :: #state{}) -> term()).
 terminate(_Reason, _State) ->
   io:format("Game server terminated~n"),
-  %ets:delete(ids),
   ok.
 %%--------------------------------------------------------------------
 %% @private

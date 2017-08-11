@@ -3,7 +3,7 @@
 %%% @author jon
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%% Represents each player/tank in the game.
+%%% Gen_server behavior - represents each player/tank in the game.
 %%% @end
 %%% Created : 05. Jul 2017 20:14
 %%%-------------------------------------------------------------------

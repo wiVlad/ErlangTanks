@@ -77,6 +77,6 @@ init([]) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
+%Starts a new shell when a player clicks "FIRE"
 start_new_shell(X,Y,Dir,PlayerPid) ->
   supervisor:start_child(?MODULE, [X,Y,Dir,PlayerPid]).

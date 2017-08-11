@@ -61,8 +61,7 @@ start_link(X,Y,Dir,PlayerPid) ->
   {ok, State :: #state{}} | {ok, State :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term()} | ignore).
 init([X,Y, Dir,PlayerPid]) ->
-  %process_flag(trap_exit, true),
-  X_inc =  - 10 * math:cos( 3.14+(Dir/180)*3.14),
+  X_inc =  - 10 * math:cos( 3.14+(Dir/180)*3.14),  %Get the correct angle
   Y_inc = 10 * math:sin( 3.14+(Dir/180)*3.14),
   erlang:send_after(?SHELL_INTERVAL, self(), trigger),
   {ok, #state{x=X,y=Y,dir=Dir,xinc = X_inc,yinc = Y_inc,playerPid=PlayerPid}}.
@@ -104,6 +103,8 @@ handle_cast(_Request, State) ->
 %% @doc
 %% Handling all non call/cast messages
 %% The trigger message tells the GUI to redraw the shell in its new position.
+%% Also sends a signal to all players with its own (X,Y) coordinates to know if
+%% it has hit a tank.
 %% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, State}
@@ -115,7 +116,7 @@ handle_cast(_Request, State) ->
   {stop, Reason :: term(), NewState :: #state{}}).
 handle_info(trigger, State = #state{x=X,y=Y,dir=Dir,xinc=Xspeed,yinc=Yspeed,playerPid=PlayerPid}) ->
   if
-    ((X<1200) and (X > -45) and (Y < 800) and (Y>-45)) ->
+    ((X<1200) and (X > -45) and (Y < 800) and (Y>-45)) ->  %Boundaries of the game frame
       gen_server:cast(gui_server, {shell, X, Y, X + Xspeed, Y + Yspeed, Dir}),
       lists:foreach(fun({_Ip,Pid}) ->
         if

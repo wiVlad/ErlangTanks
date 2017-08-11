@@ -15,7 +15,7 @@
 -include("data.hrl").
 %% Application callbacks
 -export([start/2,
-  stop/1,start_phase/3,delete_mnes/0,traverse_table_and_show/1]).
+  stop/1,start_phase/3,delete_mnes/0]).
 
 %%%===================================================================
 %%% Application callbacks
@@ -38,6 +38,8 @@
   {ok, pid(), State :: term()} |
   {error, Reason :: term()}).
 
+%Normal start to the application. First make sure no old mnesia data exists.
+%Then create new mnesia database on all nodes. Then start the game supervisor.
 start(normal, _StartArgs) ->
   io:format("normal start~n"),
   %First clear any existing mnesia data on the participating nodes
@@ -70,6 +72,9 @@ start(normal, _StartArgs) ->
     Error ->
       Error
   end;
+
+%When main node fails, backup node takes over.
+%The new node will start the application with this function.
 start({failover,_Node}, _StartArgs) ->
   io:format("not normal start: ~p~n", [failover]),
   ets:new(ids, [set, named_table, public]),
@@ -123,21 +128,11 @@ ok.
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-traverse_table_and_show(Table_name)->
-  Iterator =  fun(Rec,_)->
-    io:format("~p~n",[Rec]),
-    []
-              end,
-  case mnesia:is_transaction() of
-    true -> mnesia:foldl(Iterator,[],Table_name);
-    false ->
-      Exec = fun({Fun,Tab}) -> mnesia:foldl(Fun, [],Tab) end,
-      mnesia:activity(transaction,Exec,[{Iterator,Table_name}],mnesia_frag)
-  end.
-
 
 start_phase(_Phase,_StartType,_PhaseArgs)->
   ok.
+
+%Delete all mnesia tables and data on terminate
 delete_mnes() ->
   mnesia:delete_table(player_state),
   mnesia:delete_table(crate_state),
@@ -145,11 +140,10 @@ delete_mnes() ->
   mnesia:delete_table(gui_state),
   mnesia:delete_table(udp_state),
   case node() of
-    ?MainNode -> %spawn(?MainNode,mnesia,stop,[]),
+    ?MainNode ->
       rpc:multicall(?NodeList, application, stop, [mnesia]);
     _BackupNode ->
       rpc:multicall(?BackupNodes,mnesia,stop,[])
-      %spawn(?BackupNode,mnesia,stop,[])
   end,
   mnesia:delete_schema(?NodeList),
   ok.
