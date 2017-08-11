@@ -2,7 +2,7 @@
 %%% @author vlad
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%%
+%%% The main game supervisor, oversees must process in game.
 %%% @end
 %%% Created : 07. Jul 2017 10:12 AM
 %%%-------------------------------------------------------------------

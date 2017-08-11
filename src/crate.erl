@@ -81,6 +81,7 @@ init([0]) ->
       end,
   mnesia:transaction(F),
   {ok, #crate_state{pid = self(), x = X , y = Y, type = Type, quantity = Quantity}};
+%If failover, recreate an old crate
 init([_Pid,X,Y,Type,Quantity]) ->
   gen_server:cast(gui_server, {crate, X,Y, Type}),
   erlang:send_after(?CRATE_INTERVAL, self(), trigger),

@@ -3,7 +3,7 @@
 %%% @author jon
 %%% @copyright (C) 2017, <COMPANY>
 %%% @doc
-%%%
+%%% Represents each player/tank in the game.
 %%% @end
 %%% Created : 05. Jul 2017 20:14
 %%%-------------------------------------------------------------------
@@ -53,7 +53,9 @@ start_link(ID,Name, Num, BodyIm,TurretIm,XPos,YPos,Score,BodyDir, TurretDir, Amm
 %% @private
 %% @doc
 %% Initializes the server
-%%
+%% Creates a new tank for each new connection to the UDP server. The tank is placed
+%% on random (x,y) coordinates to begin the game and given starting resource quantities.
+%% If failover, recreates an old player
 %% @spec init(Args) -> {ok, State} |
 %%                     {ok, State, Timeout} |
 %%                     ignore |
@@ -128,6 +130,7 @@ handle_call(_Request, _From, State) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
 
+%Sent by shell, checks to see if there is a hit with player
 handle_cast({hit,ShellX,ShellY, From, PlayerPid}, State = #state{ id = ID, num = Num, ammo = Ammo, xPos = X, yPos = Y, hitPoints = HP}) ->
   if
     ?inRange(X,ShellX,Y,ShellY) ->
@@ -155,6 +158,7 @@ handle_cast({hit,ShellX,ShellY, From, PlayerPid}, State = #state{ id = ID, num =
   end,
   {noreply, State#state{ hitPoints = HPn }};
 
+%Sent by crate, checks to see if player "ate" crate
 handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ num = Num, xPos = X, yPos = Y, hitPoints = HP, ammo = Ammo}) ->
   if
     ?inRange(X,Xcrate,Y,Ycrate) ->
@@ -175,14 +179,17 @@ handle_cast({crate, Xcrate, Ycrate, Type, Quantity, From}, State = #state{ num =
   gen_server:cast(gui_server, {grid,Num, AmmoNew,HPNew}),
   {noreply, State#state{ hitPoints = HPNew, ammo = AmmoNew }};
 
+%Update the score on the GUI grid
 handle_cast({score}, State = #state{ score = Score, num = Num}) ->
-
   gen_server:cast(gui_server, {grid,Num, Score+1}),
   {noreply, State#state{ score = Score + 1 }};
 
+%Declare winner
 handle_cast({winner}, State = #state{ name = Name }) ->
   gen_server:cast(gui_server, {winner,Name}),
   {noreply, State};
+
+%"FIRE" was pressed by player, update grid and create a new shell
 handle_cast({fire, ID}, State = #state{ id = ID, num = Num, xPos = X, yPos = Y, hitPoints = HP, turretDir = Dir, ammo = Ammo}) ->
   if
     (Ammo > 0) ->
@@ -194,6 +201,7 @@ handle_cast({fire, ID}, State = #state{ id = ID, num = Num, xPos = X, yPos = Y, 
 
   {noreply,State#state{ ammo = NewAmmo }};
 
+%Player tank movement
 handle_cast({moveBody,ID ,Xspeed, Yspeed,Angle}, State = #state{ id = ID,bodyDir = BodyAngle,turretDir = TurretAngle ,bodyIm = BodyIm,turretIm = TurretIm, xPos = Xcur, yPos = Ycur}) ->
   if
     (((Xspeed + Xcur) >= 0) and ((Xspeed + Xcur) =< 1080-90)) ->
@@ -215,6 +223,7 @@ handle_cast({moveBody,ID ,Xspeed, Yspeed,Angle}, State = #state{ id = ID,bodyDir
   gen_server:cast(gui_server, {body,BodyIm,TurretIm, Xcur, Ycur, NewX,NewY,EffAngle, TurretAngle}),
   {noreply, State#state{ xPos = NewX, yPos = NewY, bodyDir = EffAngle}};
 
+%Player turret movement
 handle_cast({moveTurret,ID, Angle}, State = #state{ id= ID,bodyIm = BodyIm,turretIm = TurretIm, xPos = Xcur, yPos = Ycur, turretDir = TurretAngle, bodyDir = BodyAngle }) ->
   if (Angle =:= 0) ->
     EffAngle =  TurretAngle;
@@ -230,7 +239,8 @@ handle_cast(_Request, State) ->
 %% @private
 %% @doc
 %% Handling all non call/cast messages
-%%
+%% Backup signal to re-write data to the Mnesia database.
+%% Trigger signal to re-draw the tank so that it wont be blackened
 %% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, State}
